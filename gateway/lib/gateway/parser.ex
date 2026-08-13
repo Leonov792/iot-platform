@@ -84,6 +84,13 @@ defmodule Gateway.Parser do
   end
 
   defp parser_path do
-    Application.get_env(:gateway, :parser_path, "iot-parser")
+    base = Application.get_env(:gateway, :parser_path, "iot-parser")
+
+    cond do
+      File.regular?(base) -> base
+      # на винде собранный бинарь лежит с .exe, а в конфиге путь без расширения
+      File.regular?(base <> ".exe") -> base <> ".exe"
+      true -> base
+    end
   end
 end

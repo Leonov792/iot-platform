@@ -221,4 +221,37 @@ mod tests {
         f[n - 1] = sum;
         assert!(parse_frame(&f).is_err());
     }
+
+    fn frame_with(id: &str, kind: u8, payload: &[u8]) -> Vec<u8> {
+        let mut idb = [0u8; DEVICE_ID_LEN];
+        let b = id.as_bytes();
+        idb[..b.len()].copy_from_slice(b);
+
+        let mut f = Vec::new();
+        f.extend_from_slice(&MAGIC);
+        f.push(1);
+        f.extend_from_slice(&idb);
+        f.push(kind);
+        f.extend_from_slice(&(payload.len() as u16).to_be_bytes());
+        f.extend_from_slice(payload);
+
+        let mut sum = 0u8;
+        for &b in &f[2..] {
+            sum ^= b;
+        }
+        f.push(sum);
+        f
+    }
+
+    #[test]
+    fn zero_payload_telemetry() {
+        let f = frame_with("sensor-1", KIND_TELEMETRY, &[]);
+        assert!(parse_frame(&f).is_err());
+    }
+
+    #[test]
+    fn empty_device_id() {
+        let f = frame_with("", KIND_TELEMETRY, &[0u8; 9]);
+        assert!(parse_frame(&f).is_err());
+    }
 }
