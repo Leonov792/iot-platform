@@ -1,0 +1,47 @@
+name: Mobile
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android (сборка apk)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build debug apk
+        working-directory: mobile/android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iot-home-debug
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+
+  ios:
+    name: iOS (сборка без подписи)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (simulator, без подписи)
+        run: |
+          xcodebuild build \
+            -project mobile/ios/IoTHome.xcodeproj \
+            -scheme IoTHome \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO
