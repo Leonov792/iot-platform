@@ -33,9 +33,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: zig,cargo-zigbuild
+      - uses: mlugg/setup-zig@v1
+      - uses: taiki-e/install-action@cargo-zigbuild
       - name: Build
         run: |
           set -euo pipefail

@@ -6,6 +6,11 @@ RUN cd parser && cargo build --release
 
 # этап 2: эликсир-гейтвей
 FROM elixir:1.20-slim
+
+# slim-образ без CA-сертификатов, а mix deps.get ходит по https на hex.pm
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # отдельно копируем манифесты, чтобы deps кешировались в слое
