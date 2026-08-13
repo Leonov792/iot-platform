@@ -217,8 +217,8 @@ struct LoginView: View {
                         if register { try await APIClient.shared.register(email: email, password: password) }
                         else { try await APIClient.shared.login(email: email, password: password) }
                         onDone()
-                    } catch {
-                        error = error.localizedDescription
+                    } catch let err {
+                        error = err.localizedDescription
                     }
                     loading = false
                 }
