@@ -9,16 +9,15 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"iot-platform/api/internal/auth"
-	"iot-platform/api/internal/store"
 )
 
 type TelemetryHandler struct {
-	telemetry *store.TelemetryStore
-	devices   *store.DeviceStore
+	telemetry telemetryStore
+	devices   deviceStore
 	ingestKey string
 }
 
-func NewTelemetryHandler(t *store.TelemetryStore, d *store.DeviceStore, ingestKey string) *TelemetryHandler {
+func NewTelemetryHandler(t telemetryStore, d deviceStore, ingestKey string) *TelemetryHandler {
 	return &TelemetryHandler{telemetry: t, devices: d, ingestKey: ingestKey}
 }
 

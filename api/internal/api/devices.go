@@ -11,15 +11,14 @@ import (
 	"iot-platform/api/internal/auth"
 	"iot-platform/api/internal/gateway"
 	"iot-platform/api/internal/models"
-	"iot-platform/api/internal/store"
 )
 
 type Handler struct {
-	devices *store.DeviceStore
-	gateway *gateway.Client
+	devices deviceStore
+	gateway commandSender
 }
 
-func NewHandler(devices *store.DeviceStore, gw *gateway.Client) *Handler {
+func NewHandler(devices deviceStore, gw commandSender) *Handler {
 	return &Handler{devices: devices, gateway: gw}
 }
 
