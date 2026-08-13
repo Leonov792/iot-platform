@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: iot
+      POSTGRES_PASSWORD: iot
+      POSTGRES_DB: iot
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment:
+      API_PORT: "8080"
+      DATABASE_URL: postgres://iot:iot@postgres:5432/iot?sslmode=disable
+      GATEWAY_URL: http://gateway:4000
+      INGEST_TOKEN: dev-ingest-token
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    environment:
+      GATEWAY_PORT: "4000"
+      PARSER_PATH: /app/iot-parser
+      API_URL: http://api:8080
+      INGEST_TOKEN: dev-ingest-token
+    ports:
+      - "4000:4000"
+    depends_on:
+      - api
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+      - gateway
+
+volumes:
+  pgdata:

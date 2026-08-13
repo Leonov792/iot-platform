@@ -6,9 +6,10 @@ export default defineConfig({
   plugins: [vue(), tailwindcss()],
   server: {
     port: 5173,
-    // проксируем api на go, чтобы в дев режиме не возиться с cors
+    // проксируем api и ws на бэкенды, чтобы в дев режиме не возиться с cors
     proxy: {
-      '/api': 'http://localhost:8080'
+      '/api': { target: 'http://localhost:8080', changeOrigin: true },
+      '/ws': { target: 'http://localhost:4000', ws: true, changeOrigin: true }
     }
   }
 })

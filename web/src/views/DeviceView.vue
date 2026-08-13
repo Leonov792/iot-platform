@@ -102,7 +102,8 @@ async function loadHistory() {
 }
 
 function openWs() {
-  const base = import.meta.env.VITE_WS_URL || 'ws://localhost:4000'
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+  const base = import.meta.env.VITE_WS_URL || `${proto}://${location.host}`
   ws = new WebSocket(base + '/ws/dashboard')
   ws.onopen = () => ws.send(JSON.stringify({ type: 'subscribe', device_id: route.params.id }))
   ws.onmessage = (e) => {
