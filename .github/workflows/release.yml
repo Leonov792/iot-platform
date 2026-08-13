@@ -57,7 +57,9 @@ jobs:
         if: ${{ matrix.apt != '' }}
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt }}
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }} --manifest-path parser/Cargo.toml
+        # сборка из parser/, чтобы cargo подхватил parser/.cargo/config.toml с arm-линкерами
+        working-directory: parser
+        run: cargo build --release --target ${{ matrix.target }}
       - name: Upload
         shell: bash
         env:
