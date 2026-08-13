@@ -1,9 +1,9 @@
 defmodule Gateway.Router do
   use Plug.Router
 
-  plug Plug.Logger
-  plug :match
-  plug :dispatch
+  plug(Plug.Logger)
+  plug(:match)
+  plug(:dispatch)
 
   # сенсор цепляется сюда и шлёт бинарные кадры
   get "/ws/device/:id" do

@@ -11,7 +11,9 @@ defmodule Gateway.Ingest do
       token = Application.get_env(:gateway, :ingest_token, "dev-ingest-token")
 
       req =
-        Finch.build(:post, api_url <> "/api/v1/telemetry",
+        Finch.build(
+          :post,
+          api_url <> "/api/v1/telemetry",
           [{"content-type", "application/json"}, {"x-ingest-token", token}],
           body
         )

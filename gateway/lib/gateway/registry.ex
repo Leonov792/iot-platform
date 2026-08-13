@@ -38,7 +38,10 @@ defmodule Gateway.Registry do
       case sock_state[:role] do
         :sensor ->
           id = sock_state[:device_id]
-          if Map.get(state.sensors, id) == pid, do: Map.delete(state.sensors, id), else: state.sensors
+
+          if Map.get(state.sensors, id) == pid,
+            do: Map.delete(state.sensors, id),
+            else: state.sensors
 
         _ ->
           state.sensors

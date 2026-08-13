@@ -37,7 +37,8 @@ defmodule Gateway.SocketTest do
     sensor = %{role: :sensor, device_id: "sensor-1", subs: []}
     payload = ~s({"action":"on"})
 
-    assert {:push, {:text, ^payload}, ^sensor} = Gateway.Socket.handle_info({:command, payload}, sensor)
+    assert {:push, {:text, ^payload}, ^sensor} =
+             Gateway.Socket.handle_info({:command, payload}, sensor)
 
     dashboard = %{role: :dashboard, subs: []}
     assert {:ok, ^dashboard} = Gateway.Socket.handle_info({:command, payload}, dashboard)

@@ -61,10 +61,8 @@ fn read_frame<R: Read>(r: &mut R) -> Result<Vec<u8>, ReadErr> {
     if let Err(e) = r.read_exact(&mut header) {
         return Err(ReadErr::Bad(format!("заголовок: {e}")));
     }
-    let payload_len = u16::from_be_bytes([
-        header[1 + DEVICE_ID_LEN + 1],
-        header[1 + DEVICE_ID_LEN + 2],
-    ]) as usize;
+    let payload_len =
+        u16::from_be_bytes([header[1 + DEVICE_ID_LEN + 1], header[1 + DEVICE_ID_LEN + 2]]) as usize;
 
     let mut payload = vec![0u8; payload_len];
     if let Err(e) = r.read_exact(&mut payload) {
