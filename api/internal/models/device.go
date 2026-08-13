@@ -2,14 +2,17 @@ package models
 
 import "time"
 
-// Device — устройство, которое шлёт телеметрию.
-// Status пока строкой, потом наверное сделаю enum, но руки не доходят
+// Device — устройство в умном доме.
+// Status пока строкой, потом наверное сделаю enum, но руки не доходят.
+// State — управляемое состояние: у лампы {on:true,brightness:80}, у термостата {target_temp:22}.
 type Device struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Type      string    `json:"type"`
-	Status    string    `json:"status"`
-	OwnerID   string    `json:"owner_id"`
-	CreatedAt time.Time `json:"created_at"`
-	LastSeen  time.Time `json:"last_seen"` // обновляется, когда прилетает пакет
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	Type      string         `json:"type"`   // light | plug | thermostat | sensor
+	Status    string         `json:"status"` // online | offline
+	Room      string         `json:"room"`
+	State     map[string]any `json:"state"`
+	OwnerID   string         `json:"owner_id"`
+	CreatedAt time.Time      `json:"created_at"`
+	LastSeen  time.Time      `json:"last_seen"`
 }

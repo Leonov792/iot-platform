@@ -9,16 +9,19 @@ import (
 	"iot-platform/api/internal/auth"
 )
 
-func NewRouter(h *Handler, ah *AuthHandler) http.Handler {
+func NewRouter(h *Handler, ah *AuthHandler, th *TelemetryHandler) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	// открытые ручки — без токена
-	r.Post("/api/v1/auth/register", ah.register)
-	r.Post("/api/v1/auth/login", ah.login)
-
 	r.Route("/api/v1", func(r chi.Router) {
+		// открытые ручки — без токена
+		r.Post("/auth/register", ah.register)
+		r.Post("/auth/login", ah.login)
+
+		// ингест телеметрии не под jwt: гейтвей ходит со своим токеном
+		r.Post("/telemetry", th.ingest)
+
 		// всё, что ниже, требует авторизацию
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth)
@@ -27,6 +30,8 @@ func NewRouter(h *Handler, ah *AuthHandler) http.Handler {
 				r.Post("/", h.create)
 				r.Put("/{id}", h.update)
 				r.Delete("/{id}", h.delete)
+				r.Post("/{id}/command", h.command)
+				r.Get("/{id}/telemetry", th.history)
 			})
 		})
 	})

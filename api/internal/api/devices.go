@@ -8,16 +8,18 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"iot-platform/api/internal/auth"
+	"iot-platform/api/internal/gateway"
 	"iot-platform/api/internal/models"
 	"iot-platform/api/internal/store"
 )
 
 type Handler struct {
 	devices *store.DeviceStore
+	gateway *gateway.Client
 }
 
-func NewHandler(devices *store.DeviceStore) *Handler {
-	return &Handler{devices: devices}
+func NewHandler(devices *store.DeviceStore, gw *gateway.Client) *Handler {
+	return &Handler{devices: devices, gateway: gw}
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -55,6 +57,9 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	if d.Status == "" {
 		d.Status = "offline"
 	}
+	if d.State == nil {
+		d.State = map[string]any{}
+	}
 	d.OwnerID = ownerID
 	d.CreatedAt = time.Now()
 	d.LastSeen = time.Now()
@@ -80,6 +85,9 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "кривой json")
 		return
 	}
+	if d.State == nil {
+		d.State = map[string]any{}
+	}
 	d.ID = id
 	d.OwnerID = ownerID
 
@@ -103,6 +111,53 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type commandReq struct {
+	Action string `json:"action"`
+	Value  any    `json:"value"`
+}
+
+// command — команда на устройство. идёт по цепочке фронт -> api -> гейтвей -> устройство
+func (h *Handler) command(w http.ResponseWriter, r *http.Request) {
+	ownerID, ok := auth.UserIDFromCtx(r.Context())
+	if !ok {
+		writeErr(w, http.StatusUnauthorized, "не авторизован")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+
+	owned, err := h.devices.OwnedBy(r.Context(), id, ownerID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "база не отвечает")
+		return
+	}
+	if !owned {
+		writeErr(w, http.StatusNotFound, "устройство не найдено")
+		return
+	}
+
+	var req commandReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "кривой json")
+		return
+	}
+	if req.Action == "" {
+		writeErr(w, http.StatusBadRequest, "action обязателен")
+		return
+	}
+
+	if err := h.gateway.SendCommand(r.Context(), gateway.Command{
+		DeviceID: id,
+		Action:   req.Action,
+		Value:    req.Value,
+	}); err != nil {
+		// гейтвей лежит — честно говорим 502, не врём клиенту
+		writeErr(w, http.StatusBadGateway, "гейтвей не доступен: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "отправлено"})
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

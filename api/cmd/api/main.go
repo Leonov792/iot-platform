@@ -13,6 +13,7 @@ import (
 	"iot-platform/api/internal/api"
 	"iot-platform/api/internal/config"
 	"iot-platform/api/internal/db"
+	"iot-platform/api/internal/gateway"
 	"iot-platform/api/internal/store"
 )
 
@@ -35,13 +36,17 @@ func main() {
 
 	devices := store.NewDeviceStore(pool)
 	users := store.NewUserStore(pool)
+	telemetry := store.NewTelemetryStore(pool)
 
-	h := api.NewHandler(devices)
+	gw := gateway.NewClient(cfg.GatewayURL)
+
+	h := api.NewHandler(devices, gw)
 	ah := api.NewAuthHandler(users)
+	th := api.NewTelemetryHandler(telemetry, devices, cfg.IngestToken)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: api.NewRouter(h, ah),
+		Handler: api.NewRouter(h, ah, th),
 		// таймауты добавил не сразу: компилятор молчал, но голанци орал. вставил на всякий
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
