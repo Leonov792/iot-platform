@@ -1,0 +1,7 @@
+[package]
+name = "iot-parser"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# намеренно без зависимостей — парсер маленький, тащить serde ради одной строки json неохота
