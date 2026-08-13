@@ -16,9 +16,10 @@ func NewDeviceStore(db *pgxpool.Pool) *DeviceStore {
 	return &DeviceStore{db: db}
 }
 
-func (s *DeviceStore) List(ctx context.Context) ([]models.Device, error) {
+func (s *DeviceStore) List(ctx context.Context, ownerID string) ([]models.Device, error) {
 	rows, err := s.db.Query(ctx,
-		`SELECT id, name, type, status, created_at, last_seen FROM devices ORDER BY created_at DESC`)
+		`SELECT id, name, type, status, owner_id, created_at, last_seen
+		 FROM devices WHERE owner_id=$1 ORDER BY created_at DESC`, ownerID)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +28,7 @@ func (s *DeviceStore) List(ctx context.Context) ([]models.Device, error) {
 	devices := make([]models.Device, 0)
 	for rows.Next() {
 		var d models.Device
-		if err := rows.Scan(&d.ID, &d.Name, &d.Type, &d.Status, &d.CreatedAt, &d.LastSeen); err != nil {
+		if err := rows.Scan(&d.ID, &d.Name, &d.Type, &d.Status, &d.OwnerID, &d.CreatedAt, &d.LastSeen); err != nil {
 			return nil, err
 		}
 		devices = append(devices, d)
@@ -37,19 +38,20 @@ func (s *DeviceStore) List(ctx context.Context) ([]models.Device, error) {
 
 func (s *DeviceStore) Create(ctx context.Context, d models.Device) error {
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO devices (id, name, type, status, created_at, last_seen) VALUES ($1,$2,$3,$4,$5,$6)`,
-		d.ID, d.Name, d.Type, d.Status, d.CreatedAt, d.LastSeen)
+		`INSERT INTO devices (id, name, type, status, owner_id, created_at, last_seen)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		d.ID, d.Name, d.Type, d.Status, d.OwnerID, d.CreatedAt, d.LastSeen)
 	return err
 }
 
-func (s *DeviceStore) Update(ctx context.Context, d models.Device) error {
+func (s *DeviceStore) Update(ctx context.Context, ownerID string, d models.Device) error {
 	_, err := s.db.Exec(ctx,
-		`UPDATE devices SET name=$1, type=$2, status=$3 WHERE id=$4`,
-		d.Name, d.Type, d.Status, d.ID)
+		`UPDATE devices SET name=$1, type=$2, status=$3 WHERE id=$4 AND owner_id=$5`,
+		d.Name, d.Type, d.Status, d.ID, ownerID)
 	return err
 }
 
-func (s *DeviceStore) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx, `DELETE FROM devices WHERE id=$1`, id)
+func (s *DeviceStore) Delete(ctx context.Context, ownerID, id string) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM devices WHERE id=$1 AND owner_id=$2`, id, ownerID)
 	return err
 }

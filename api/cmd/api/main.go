@@ -34,11 +34,14 @@ func main() {
 	}
 
 	devices := store.NewDeviceStore(pool)
+	users := store.NewUserStore(pool)
+
 	h := api.NewHandler(devices)
+	ah := api.NewAuthHandler(users)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: api.NewRouter(h),
+		Handler: api.NewRouter(h, ah),
 		// таймауты добавил не сразу: компилятор молчал, но голанци орал. вставил на всякий
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,

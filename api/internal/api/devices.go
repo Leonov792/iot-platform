@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"iot-platform/api/internal/auth"
 	"iot-platform/api/internal/models"
 	"iot-platform/api/internal/store"
 )
@@ -20,7 +21,13 @@ func NewHandler(devices *store.DeviceStore) *Handler {
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
-	devices, err := h.devices.List(r.Context())
+	ownerID, ok := auth.UserIDFromCtx(r.Context())
+	if !ok {
+		writeErr(w, http.StatusUnauthorized, "не авторизован")
+		return
+	}
+
+	devices, err := h.devices.List(r.Context(), ownerID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "не смог вытащить устройства")
 		return
@@ -29,6 +36,12 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
+	ownerID, ok := auth.UserIDFromCtx(r.Context())
+	if !ok {
+		writeErr(w, http.StatusUnauthorized, "не авторизован")
+		return
+	}
+
 	var d models.Device
 	if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
 		writeErr(w, http.StatusBadRequest, "кривой json")
@@ -42,6 +55,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	if d.Status == "" {
 		d.Status = "offline"
 	}
+	d.OwnerID = ownerID
 	d.CreatedAt = time.Now()
 	d.LastSeen = time.Now()
 
@@ -53,6 +67,12 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
+	ownerID, ok := auth.UserIDFromCtx(r.Context())
+	if !ok {
+		writeErr(w, http.StatusUnauthorized, "не авторизован")
+		return
+	}
+
 	id := chi.URLParam(r, "id")
 
 	var d models.Device
@@ -61,8 +81,9 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d.ID = id
+	d.OwnerID = ownerID
 
-	if err := h.devices.Update(r.Context(), d); err != nil {
+	if err := h.devices.Update(r.Context(), ownerID, d); err != nil {
 		writeErr(w, http.StatusInternalServerError, "не смог обновить устройство")
 		return
 	}
@@ -70,8 +91,14 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
+	ownerID, ok := auth.UserIDFromCtx(r.Context())
+	if !ok {
+		writeErr(w, http.StatusUnauthorized, "не авторизован")
+		return
+	}
+
 	id := chi.URLParam(r, "id")
-	if err := h.devices.Delete(r.Context(), id); err != nil {
+	if err := h.devices.Delete(r.Context(), ownerID, id); err != nil {
 		writeErr(w, http.StatusInternalServerError, "не смог удалить устройство")
 		return
 	}
