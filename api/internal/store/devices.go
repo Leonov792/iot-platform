@@ -44,6 +44,14 @@ func (s *DeviceStore) Create(ctx context.Context, d models.Device) error {
 	return err
 }
 
+func (s *DeviceStore) Get(ctx context.Context, id string) (models.Device, error) {
+	var d models.Device
+	err := s.db.QueryRow(ctx,
+		`SELECT id, name, type, status, room, state, owner_id, created_at, last_seen FROM devices WHERE id=$1`, id).
+		Scan(&d.ID, &d.Name, &d.Type, &d.Status, &d.Room, &d.State, &d.OwnerID, &d.CreatedAt, &d.LastSeen)
+	return d, err
+}
+
 func (s *DeviceStore) Update(ctx context.Context, ownerID string, d models.Device) error {
 	_, err := s.db.Exec(ctx,
 		`UPDATE devices SET name=$1, type=$2, status=$3, room=$4, state=$5 WHERE id=$6 AND owner_id=$7`,

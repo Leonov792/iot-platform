@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -157,7 +158,41 @@ func (h *Handler) command(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, "гейтвей не доступен: "+err.Error())
 		return
 	}
+
+	// оптимистично двигаем состояние в базе, чтобы фронт сразу видел новое
+	h.applyState(r.Context(), ownerID, id, req.Action, req.Value)
+
 	writeJSON(w, http.StatusOK, map[string]string{"status": "отправлено"})
+}
+
+// applyState — кладём в state устройства то, что влезло из команды.
+// если не получилось — не фатально, команда и так ушла на устройство
+func (h *Handler) applyState(ctx context.Context, ownerID, id, action string, value any) {
+	d, err := h.devices.Get(ctx, id)
+	if err != nil {
+		return
+	}
+	if d.State == nil {
+		d.State = map[string]any{}
+	}
+
+	switch action {
+	case "on":
+		d.State["on"] = true
+	case "off":
+		d.State["on"] = false
+	case "set_brightness":
+		if v, ok := value.(float64); ok {
+			d.State["brightness"] = v
+			d.State["on"] = v > 0
+		}
+	case "set_target":
+		if v, ok := value.(float64); ok {
+			d.State["target_temp"] = v
+		}
+	}
+
+	_ = h.devices.Update(ctx, ownerID, d)
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
