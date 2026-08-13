@@ -33,7 +33,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/install-action@cargo-zigbuild
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: zig,cargo-zigbuild
       - name: Build
         run: |
           set -euo pipefail
@@ -65,10 +67,15 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # docker требует lowercase в имени образа, а github.repository может быть с заглавными
+      - id: meta
+        run: |
+          repo=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${repo}-gateway" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: gateway/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ github.repository }}-gateway:${{ github.ref_name }}
+          tags: ${{ steps.meta.outputs.image }}:${{ github.ref_name }}
