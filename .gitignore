@@ -1,0 +1,24 @@
+# Go
+api/bin/
+*.exe
+*.test
+
+# Elixir
+gateway/_build/
+gateway/deps/
+gateway/.elixir_ls/
+gateway/*.ez
+
+# Rust
+parser/target/
+
+# Frontend
+web/node_modules/
+web/dist/
+web/.vite/
+
+# IDE / прочее
+.idea/
+.vscode/
+.DS_Store
+*.log
