@@ -1,39 +1,62 @@
 package main
 
 import (
-	"fmt"
+	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"iot-platform/api/internal/api"
+	"iot-platform/api/internal/config"
+	"iot-platform/api/internal/db"
+	"iot-platform/api/internal/store"
 )
 
-// порт по умолчанию, если окружение не настроено
-const defaultPort = "8080"
-
 func main() {
-	port := os.Getenv("API_PORT")
-	if port == "" {
-		// TODO: вынести чтение конфига в отдельный файл, надоело по мелочи лазить
-		port = defaultPort
+	cfg := config.Load()
+
+	// чтобы гаситься по ctrl+c, а не оставлять висящие соединения в постгресе
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := db.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("не подключился к постгресу: %v", err)
+	}
+	defer pool.Close()
+
+	if err := db.Migrate(ctx, pool); err != nil {
+		log.Fatalf("миграции не прошли: %v", err)
 	}
 
-	mux := http.NewServeMux()
+	devices := store.NewDeviceStore(pool)
+	h := api.NewHandler(devices)
 
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "ok")
-	})
+	srv := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: api.NewRouter(h),
+		// таймауты добавил не сразу: компилятор молчал, но голанци орал. вставил на всякий
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
 
-	// пока единственный "рут", потом тут будет версионированный api
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "iot api alive")
-	})
+	go func() {
+		log.Printf("поднимаю http на %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("сервер сдох: %v", err)
+		}
+	}()
 
-	addr := ":" + port
-	log.Printf("поднимаю http на %s", addr)
+	<-ctx.Done()
+	log.Println("гашу сервер...")
 
-	// без таймаутов пока, в проде обязательно добавить
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatalf("сервер сдох: %v", err)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("не успел погаситься нормально: %v", err)
 	}
 }
