@@ -27,30 +27,50 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   rust:
-    name: Rust-парсер (6 платформ)
-    runs-on: ubuntu-latest
+    name: Rust-парсер (${{ matrix.target }})
     needs: goreleaser
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            apt: gcc-aarch64-linux-gnu
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
+            apt: gcc-arm-linux-gnueabihf
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
-          target: x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu,armv7-unknown-linux-gnueabihf,x86_64-apple-darwin,aarch64-apple-darwin,x86_64-pc-windows-gnu
+          targets: ${{ matrix.target }}
+      - name: Install cross gcc
+        if: ${{ matrix.apt != '' }}
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt }}
       - name: Build
-        run: |
-          set -euo pipefail
-          targets=(x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu armv7-unknown-linux-gnueabihf x86_64-apple-darwin aarch64-apple-darwin)
-          for t in "${targets[@]}"; do
-            cargo zigbuild --release --target "$t" --manifest-path parser/Cargo.toml
-            cp "parser/target/$t/release/iot-parser" "iot-parser-$t"
-          done
-          # windows отдельно: там .exe и gnu-abi (zig не тянет msvc)
-          cargo zigbuild --release --target x86_64-pc-windows-gnu --manifest-path parser/Cargo.toml
-          cp "parser/target/x86_64-pc-windows-gnu/release/iot-parser.exe" "iot-parser-x86_64-pc-windows-gnu.exe"
+        run: cargo build --release --target ${{ matrix.target }} --manifest-path parser/Cargo.toml
       - name: Upload
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "$GITHUB_REF_NAME" iot-parser-* --clobber
+        run: |
+          t="${{ matrix.target }}"
+          if [ -f "parser/target/$t/release/iot-parser.exe" ]; then
+            cp "parser/target/$t/release/iot-parser.exe" "iot-parser-$t.exe"
+            gh release upload "$GITHUB_REF_NAME" "iot-parser-$t.exe" --clobber
+          else
+            cp "parser/target/$t/release/iot-parser" "iot-parser-$t"
+            gh release upload "$GITHUB_REF_NAME" "iot-parser-$t" --clobber
+          fi
 
   docker:
     name: Гейтвей docker (amd64 + arm64)
