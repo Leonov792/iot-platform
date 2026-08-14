@@ -47,15 +47,19 @@ func (h *AuthHandler) register(w http.ResponseWriter, r *http.Request) {
 		ID:           uuid.NewString(),
 		Email:        req.Email,
 		PasswordHash: hash,
+		Role:         auth.RoleOwner,
+		Schedule:     []models.ScheduleEntry{},
 		CreatedAt:    time.Now(),
 	}
+	u.HomeID = u.ID // владелец сам себе «дом»
+
 	if err := h.users.Create(r.Context(), u); err != nil {
 		// TODO: отличать дубль почты от падения базы, пока сваливаю всё в 409
 		writeErr(w, http.StatusConflict, "такой юзер уже есть или база отвалилась")
 		return
 	}
 
-	token, err := auth.GenerateToken(u.ID, 24*time.Hour)
+	token, err := auth.GenerateTokenWithRole(u.ID, u.Role, u.HomeID, 24*time.Hour)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "не смог подписать токен")
 		return
@@ -87,7 +91,7 @@ func (h *AuthHandler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.GenerateToken(u.ID, 24*time.Hour)
+	token, err := auth.GenerateTokenWithRole(u.ID, u.Role, u.HomeID, 24*time.Hour)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "не смог подписать токен")
 		return

@@ -1,0 +1,78 @@
+{
+  "api_url": "http://localhost:8080",
+  "ingest_token": "dev-ingest-token",
+  "modbus_url": "http://localhost:8090",
+  "modbus_write_token": "dev-write-token",
+  "gateway_url": "http://localhost:4000",
+  "rules_token": "dev-rules-token",
+  "listen": ":8091",
+  "poll_interval": "2s",
+  "rules": [
+    {
+      "id": "pool-fill-open",
+      "name": "Автодолив воды: открыть клапан",
+      "cooldown": "1m",
+      "condition": { "device_id": "pool-pump", "field": "water_level", "op": "lt", "value": 20 },
+      "actions": [
+        { "type": "modbus_write", "device_id": "pool-pump", "relay": "fill_valve", "value": true }
+      ]
+    },
+    {
+      "id": "pool-fill-close",
+      "name": "Автодолив воды: закрыть клапан",
+      "cooldown": "1m",
+      "condition": { "device_id": "pool-pump", "field": "water_level", "op": "gte", "value": 95 },
+      "actions": [
+        { "type": "modbus_write", "device_id": "pool-pump", "relay": "fill_valve", "value": false }
+      ]
+    },
+    {
+      "id": "pool-chlorine-dose",
+      "name": "Доза хлора при низком ORP",
+      "cooldown": "30m",
+      "condition": { "device_id": "pool-pump", "field": "orp", "op": "lt", "value": 650 },
+      "actions": [
+        {
+          "type": "modbus_write",
+          "device_id": "pool-pump",
+          "relay": "chlorine_pump",
+          "value": true,
+          "off_after": "30s"
+        }
+      ]
+    },
+    {
+      "id": "pool-ph-dose",
+      "name": "Доза pH-минус при высоком pH",
+      "cooldown": "30m",
+      "condition": { "device_id": "pool-pump", "field": "ph", "op": "gt", "value": 7.6 },
+      "actions": [
+        {
+          "type": "modbus_write",
+          "device_id": "pool-pump",
+          "relay": "ph_pump",
+          "value": true,
+          "off_after": "30s"
+        }
+      ]
+    },
+    {
+      "id": "gym-ventilation",
+      "name": "Вытяжка спортзала при влажности",
+      "cooldown": "5m",
+      "condition": { "device_id": "gym-climat", "field": "humidity", "op": "gt", "value": 70 },
+      "actions": [
+        { "type": "modbus_write", "device_id": "gym-climat", "relay": "exhaust_fan", "value": true }
+      ]
+    },
+    {
+      "id": "gym-ventilation-off",
+      "name": "Выключить вытяжку спортзала",
+      "cooldown": "5m",
+      "condition": { "device_id": "gym-climat", "field": "humidity", "op": "lte", "value": 55 },
+      "actions": [
+        { "type": "modbus_write", "device_id": "gym-climat", "relay": "exhaust_fan", "value": false }
+      ]
+    }
+  ]
+}

@@ -82,6 +82,28 @@ func (f *fakeDeviceStore) OwnedBy(_ context.Context, deviceID, ownerID string) (
 
 func (f *fakeDeviceStore) Touch(_ context.Context, id string) error { return nil }
 
+func (f *fakeDeviceStore) SetDeviceTokenHash(_ context.Context, id, ownerID, hash string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if d, ok := f.devices[id]; ok && d.OwnerID == ownerID {
+		d.State = map[string]any{}
+		d.State["__token_hash"] = hash
+		f.devices[id] = d
+	}
+	return nil
+}
+
+func (f *fakeDeviceStore) GetDeviceTokenHash(_ context.Context, id string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if d, ok := f.devices[id]; ok {
+		if h, ok := d.State["__token_hash"].(string); ok && h != "" {
+			return h, nil
+		}
+	}
+	return "", store.ErrNotFound
+}
+
 type fakeUserStore struct {
 	mu    sync.Mutex
 	users map[string]models.User
@@ -107,6 +129,55 @@ func (f *fakeUserStore) GetByEmail(_ context.Context, email string) (models.User
 	return models.User{}, store.ErrNotFound
 }
 
+func (f *fakeUserStore) GetByID(_ context.Context, id string) (models.User, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, u := range f.users {
+		if u.ID == id {
+			return u, nil
+		}
+	}
+	return models.User{}, store.ErrNotFound
+}
+
+func (f *fakeUserStore) ListByHome(_ context.Context, homeID string) ([]models.User, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]models.User, 0)
+	for _, u := range f.users {
+		if u.HomeID == homeID {
+			out = append(out, u)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeUserStore) SetRole(_ context.Context, userID, homeID, role string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for k, u := range f.users {
+		if u.ID == userID && u.HomeID == homeID {
+			u.Role = role
+			f.users[k] = u
+			return nil
+		}
+	}
+	return store.ErrNotFound
+}
+
+func (f *fakeUserStore) SetSchedule(_ context.Context, userID, homeID string, schedule []models.ScheduleEntry) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for k, u := range f.users {
+		if u.ID == userID && u.HomeID == homeID {
+			u.Schedule = schedule
+			f.users[k] = u
+			return nil
+		}
+	}
+	return store.ErrNotFound
+}
+
 type fakeTelemetryStore struct {
 	mu   sync.Mutex
 	rows map[string][]models.Telemetry
@@ -129,6 +200,16 @@ func (f *fakeTelemetryStore) List(_ context.Context, deviceID string, _ time.Tim
 	return f.rows[deviceID], nil
 }
 
+func (f *fakeTelemetryStore) Latest(_ context.Context, deviceID string) (models.Telemetry, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	rows := f.rows[deviceID]
+	if len(rows) == 0 {
+		return models.Telemetry{}, store.ErrNotFound
+	}
+	return rows[len(rows)-1], nil
+}
+
 type fakeGateway struct {
 	mu   sync.Mutex
 	sent []gateway.Command
@@ -148,15 +229,21 @@ func newTestRouter() (http.Handler, *fakeDeviceStore, *fakeUserStore, *fakeTelem
 	ts := newFakeTelemetryStore()
 	gw := &fakeGateway{}
 
-	h := NewHandler(ds, gw)
+	h := NewHandler(ds, gw, us, nil, "test-token")
 	ah := NewAuthHandler(us)
 	th := NewTelemetryHandler(ts, ds, "test-token")
+	uh := NewUsersHandler(us)
 
-	return NewRouter(h, ah, th), ds, us, ts, gw
+	return NewRouter(h, ah, th, uh), ds, us, ts, gw
 }
 
 func authHeader(userID string) string {
 	tok, _ := auth.GenerateToken(userID, time.Hour)
+	return "Bearer " + tok
+}
+
+func authHeaderRole(userID, role, homeID string) string {
+	tok, _ := auth.GenerateTokenWithRole(userID, role, homeID, time.Hour)
 	return "Bearer " + tok
 }
 

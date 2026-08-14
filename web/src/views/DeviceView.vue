@@ -18,7 +18,7 @@
     <div class="mt-6 rounded-2xl bg-white p-6 shadow">
       <h2 class="font-medium text-slate-700">Управление</h2>
 
-      <div v-if="device?.type === 'light'" class="mt-4 flex items-center gap-4">
+      <div v-if="device?.type === 'light'" class="mt-4 flex flex-wrap items-center gap-4">
         <button
           :class="state.on ? 'bg-amber-400 text-white' : 'bg-slate-100 text-slate-600'"
           class="rounded-lg px-4 py-2 text-sm"
@@ -31,6 +31,16 @@
           <input v-model.number="brightness" type="range" min="0" max="100" class="w-40"
             @change="send('set_brightness', brightness)" />
           <span class="text-slate-400">{{ brightness }}%</span>
+        </label>
+        <label class="flex items-center gap-2 text-sm text-slate-600">
+          Цвет
+          <input
+            v-model="color"
+            type="color"
+            class="h-8 w-10 cursor-pointer rounded border"
+            @change="sendColor"
+          />
+          <span class="font-mono text-slate-400">{{ color }}</span>
         </label>
       </div>
 
@@ -86,6 +96,7 @@ const last = computed(() => points.value[points.value.length - 1])
 
 const brightness = ref(100)
 const target = ref(22)
+const color = ref('#ffd700')
 
 async function loadDevice() {
   const { data } = await api.get('/api/v1/devices')
@@ -93,7 +104,14 @@ async function loadDevice() {
   if (device.value) {
     brightness.value = device.value.state?.brightness ?? 100
     target.value = device.value.state?.target_temp ?? 22
+    if (device.value.state?.color) {
+      color.value = '#' + device.value.state.color
+    }
   }
+}
+
+function sendColor() {
+  send('set_color', color.value.replace('#', ''))
 }
 
 async function loadHistory() {

@@ -5,10 +5,28 @@ defmodule Gateway.Router do
   plug(:match)
   plug(:dispatch)
 
-  # сенсор цепляется сюда и шлёт бинарные кадры
+  # сенсор цепляется сюда и шлёт бинарные кадры.
+  # до апгрейда проверяем device token, чтобы исключить подмену данных.
+  # в локальной разработке проверку можно выключить через DEVICE_AUTH_ENABLED=false
   get "/ws/device/:id" do
     id = conn.path_params["id"]
 
+    if Gateway.DeviceAuth.enabled?() do
+      case Gateway.DeviceAuth.verify(id, Gateway.DeviceAuth.token_from_conn(conn)) do
+        :ok ->
+          upgrade_sensor(conn, id)
+
+        {:error, reason} ->
+          conn
+          |> send_resp(401, Jason.encode!(%{"error" => reason}))
+          |> halt()
+      end
+    else
+      upgrade_sensor(conn, id)
+    end
+  end
+
+  defp upgrade_sensor(conn, id) do
     conn
     |> WebSockAdapter.upgrade(Gateway.Socket, %{role: :sensor, device_id: id, subs: []},
       timeout: 60_000

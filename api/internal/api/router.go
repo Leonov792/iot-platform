@@ -9,7 +9,7 @@ import (
 	"iot-platform/api/internal/auth"
 )
 
-func NewRouter(h *Handler, ah *AuthHandler, th *TelemetryHandler) http.Handler {
+func NewRouter(h *Handler, ah *AuthHandler, th *TelemetryHandler, uh *UsersHandler) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -32,9 +32,20 @@ func NewRouter(h *Handler, ah *AuthHandler, th *TelemetryHandler) http.Handler {
 				r.Delete("/{id}", h.delete)
 				r.Post("/{id}/command", h.command)
 				r.Get("/{id}/telemetry", th.history)
+				r.Post("/{id}/token", h.generateDeviceToken)
+			})
+			r.Route("/users", func(r chi.Router) {
+				r.Get("/", uh.list)
+				r.Post("/", uh.createMember)
+				r.Put("/{id}/role", uh.setRole)
+				r.Put("/{id}/schedule", uh.setSchedule)
 			})
 		})
 	})
+
+	// закрытые ручки для гейтвея (ingest-токен). сюда фронт не ходит
+	r.Post("/internal/device/{id}/verify", h.verifyDeviceToken)
+	r.Get("/internal/telemetry/{id}/latest", th.latestInternal)
 
 	// для докера, чтобы мог проверять живость
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {

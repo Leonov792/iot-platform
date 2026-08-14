@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -20,6 +21,7 @@ var (
 	devType  = flag.String("type", "sensor", "тип: sensor|light|plug|thermostat")
 	gateway  = flag.String("url", "ws://localhost:4000/ws/device/", "url гейтвея")
 	interval = flag.Duration("interval", 2*time.Second, "как часто слать телеметрию")
+	token    = flag.String("token", "", "device token (выдаёт API через POST /devices/{id}/token)")
 )
 
 const (
@@ -52,7 +54,12 @@ func main() {
 }
 
 func run(url string, st *deviceState) error {
-	c, _, err := websocket.DefaultDialer.Dial(url, nil)
+	header := http.Header{}
+	if *token != "" {
+		header.Set("X-Device-Token", *token)
+	}
+
+	c, _, err := websocket.DefaultDialer.Dial(url, header)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,18 @@
 [package]
-name = "iot-parser"
-version = "0.1.0"
+name = "gateway_parser"
+version = "0.2.0"
 edition = "2021"
 
+# либа — для Rustler NIF (вызывается из BEAM напрямую, без subprocess).
+# бинарь — обратная совместимость (stdin->stdout) для эмулятора и офлайн-демо.
+[lib]
+name = "gateway_parser"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "iot-parser"
+path = "src/main.rs"
+
 [dependencies]
-# намеренно без зависимостей — парсер маленький, тащить serde ради одной строки json неохота
+rustler = "0.38"

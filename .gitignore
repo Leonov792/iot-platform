@@ -8,6 +8,7 @@ gateway/_build/
 gateway/deps/
 gateway/.elixir_ls/
 gateway/*.ez
+gateway/priv/native/
 
 # Rust
 parser/target/

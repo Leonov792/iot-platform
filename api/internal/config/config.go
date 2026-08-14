@@ -7,6 +7,7 @@ type Config struct {
 	DatabaseURL string
 	GatewayURL  string
 	IngestToken string
+	JWTSecret   string
 }
 
 // Load читает настройки из окружения. Дефолты под локальную сборку,
@@ -17,6 +18,7 @@ func Load() Config {
 		DatabaseURL: getEnv("DATABASE_URL", "postgres://iot:iot@localhost:5432/iot?sslmode=disable"),
 		GatewayURL:  getEnv("GATEWAY_URL", "http://localhost:4000"),
 		IngestToken: getEnv("INGEST_TOKEN", "dev-ingest-token"),
+		JWTSecret:   getEnv("JWT_SECRET", "dev-secret-tut-potom-zamenyu"),
 	}
 }
 

@@ -1,0 +1,38 @@
+{
+  "api_url": "http://localhost:8080",
+  "ingest_token": "dev-ingest-token",
+  "write_token": "dev-write-token",
+  "listen": ":8090",
+  "poll_interval_ms": 5000,
+  "devices": [
+    {
+      "id": "pool-pump",
+      "host": "192.168.1.50",
+      "port": 502,
+      "unit": 1,
+      "points": [
+        { "name": "ph", "register": "input", "address": 0, "scale": 0.01, "unit": "pH" },
+        { "name": "orp", "register": "input", "address": 1, "scale": 1.0, "unit": "mV" },
+        { "name": "water_level", "register": "input", "address": 2, "scale": 0.1, "unit": "%" }
+      ],
+      "relays": [
+        { "name": "fill_valve", "register": "coil", "address": 0 },
+        { "name": "chlorine_pump", "register": "coil", "address": 1 },
+        { "name": "ph_pump", "register": "coil", "address": 2 }
+      ]
+    },
+    {
+      "id": "gym-climat",
+      "host": "192.168.1.51",
+      "port": 502,
+      "unit": 1,
+      "points": [
+        { "name": "humidity", "register": "input", "address": 0, "scale": 0.1, "unit": "%" },
+        { "name": "temp", "register": "input", "address": 1, "scale": 0.1, "unit": "C" }
+      ],
+      "relays": [
+        { "name": "exhaust_fan", "register": "coil", "address": 0 }
+      ]
+    }
+  ]
+}

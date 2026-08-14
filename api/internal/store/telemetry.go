@@ -24,6 +24,16 @@ func (s *TelemetryStore) Insert(ctx context.Context, deviceID string, payload ma
 	return err
 }
 
+// Latest отдаёт последнюю точку телеметрии устройства (для движка автоматизации).
+func (s *TelemetryStore) Latest(ctx context.Context, deviceID string) (models.Telemetry, error) {
+	var t models.Telemetry
+	err := s.db.QueryRow(ctx,
+		`SELECT id, device_id, ts, payload FROM telemetry
+		 WHERE device_id=$1 ORDER BY ts DESC LIMIT 1`, deviceID).
+		Scan(&t.ID, &t.DeviceID, &t.TS, &t.Payload)
+	return t, err
+}
+
 // List отдаёт последние limit точек, но в хронологическом порядке — для графика.
 // берём последние N через подзапрос, потом разворачиваем по ts ASC
 func (s *TelemetryStore) List(ctx context.Context, deviceID string, since time.Time, limit int) ([]models.Telemetry, error) {

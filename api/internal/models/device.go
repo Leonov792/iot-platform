@@ -11,6 +11,7 @@ type Device struct {
 	Type      string         `json:"type"`   // light | plug | thermostat | sensor
 	Status    string         `json:"status"` // online | offline
 	Room      string         `json:"room"`
+	Zone      string         `json:"zone"` // home | pool | gym — для RBAC и сценариев
 	State     map[string]any `json:"state"`
 	OwnerID   string         `json:"owner_id"`
 	CreatedAt time.Time      `json:"created_at"`

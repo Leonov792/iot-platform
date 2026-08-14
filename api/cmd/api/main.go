@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"iot-platform/api/internal/api"
+	"iot-platform/api/internal/auth"
 	"iot-platform/api/internal/config"
 	"iot-platform/api/internal/db"
 	"iot-platform/api/internal/gateway"
@@ -19,6 +20,7 @@ import (
 
 func main() {
 	cfg := config.Load()
+	auth.SetSecret([]byte(cfg.JWTSecret))
 
 	// чтобы гаситься по ctrl+c, а не оставлять висящие соединения в постгресе
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -37,16 +39,18 @@ func main() {
 	devices := store.NewDeviceStore(pool)
 	users := store.NewUserStore(pool)
 	telemetry := store.NewTelemetryStore(pool)
+	commands := store.NewCommandLogStore(pool)
 
 	gw := gateway.NewClient(cfg.GatewayURL)
 
-	h := api.NewHandler(devices, gw)
+	h := api.NewHandler(devices, gw, users, commands, cfg.IngestToken)
 	ah := api.NewAuthHandler(users)
 	th := api.NewTelemetryHandler(telemetry, devices, cfg.IngestToken)
+	uh := api.NewUsersHandler(users)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: api.NewRouter(h, ah, th),
+		Handler: api.NewRouter(h, ah, th, uh),
 		// таймауты добавил не сразу: компилятор молчал, но голанци орал. вставил на всякий
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,

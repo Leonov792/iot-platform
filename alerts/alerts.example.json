@@ -1,0 +1,44 @@
+{
+  "api_url": "http://localhost:8080",
+  "ingest_token": "dev-ingest-token",
+  "poll_interval": "5s",
+  "telegram_token": "",
+  "telegram_chat": "",
+  "fcm_credentials": "/secrets/firebase-service-account.json",
+  "fcm_topic": "iot-alerts",
+  "alerts": [
+    {
+      "id": "pool-leak",
+      "name": "Протечка в бассейне",
+      "severity": "critical",
+      "device_id": "pool-pump",
+      "field": "water_level",
+      "op": "lt",
+      "value": 10,
+      "message": "Уровень воды упал ниже 10% — возможна протечка.",
+      "cooldown": "15m"
+    },
+    {
+      "id": "sauna-overheat",
+      "name": "Перегрев сауны",
+      "severity": "critical",
+      "device_id": "sauna",
+      "field": "temp",
+      "op": "gt",
+      "value": 110,
+      "message": "Температура в сауне выше 110°C.",
+      "cooldown": "5m"
+    },
+    {
+      "id": "smoke",
+      "name": "Задымление",
+      "severity": "critical",
+      "device_id": "smoke-sensor",
+      "field": "smoke",
+      "op": "gt",
+      "value": 0,
+      "message": "Датчик дыма сработал.",
+      "cooldown": "1m"
+    }
+  ]
+}

@@ -1,12 +1,23 @@
 import { defineStore } from 'pinia'
 import api from '../api'
 
+function decodeRole(token) {
+  if (!token) return ''
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.role || ''
+  } catch {
+    return ''
+  }
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: localStorage.getItem('token') || ''
   }),
   getters: {
-    isAuthed: (s) => !!s.token
+    isAuthed: (s) => !!s.token,
+    role: (s) => decodeRole(s.token)
   },
   actions: {
     async login(email, password) {

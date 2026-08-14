@@ -54,9 +54,26 @@ func (h *TelemetryHandler) ingest(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// history — отдаёт последние точки для графика. доступ только владельцу устройства
+// latestInternal — последняя точка телеметрии устройства.
+// закрытая ручка для движка автоматизации/ИИ (ingest-токен).
+func (h *TelemetryHandler) latestInternal(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("X-Ingest-Token") != h.ingestKey {
+		writeErr(w, http.StatusUnauthorized, "неверный ingest-токен")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	t, err := h.telemetry.Latest(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "телеметрии нет")
+		return
+	}
+	writeJSON(w, http.StatusOK, t)
+}
+
+// history — отдаёт последние точки для графика. доступ членам дома
 func (h *TelemetryHandler) history(w http.ResponseWriter, r *http.Request) {
-	ownerID, ok := auth.UserIDFromCtx(r.Context())
+	homeID, ok := auth.HomeIDFromCtx(r.Context())
 	if !ok {
 		writeErr(w, http.StatusUnauthorized, "не авторизован")
 		return
@@ -64,7 +81,7 @@ func (h *TelemetryHandler) history(w http.ResponseWriter, r *http.Request) {
 
 	deviceID := chi.URLParam(r, "id")
 
-	owned, err := h.devices.OwnedBy(r.Context(), deviceID, ownerID)
+	owned, err := h.devices.OwnedBy(r.Context(), deviceID, homeID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "база не отвечает")
 		return

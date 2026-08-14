@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16
+    image: timescale/timescaledb:latest-pg16
     environment:
       POSTGRES_USER: iot
       POSTGRES_PASSWORD: iot
@@ -19,6 +19,7 @@ services:
       DATABASE_URL: postgres://iot:iot@postgres:5432/iot?sslmode=disable
       GATEWAY_URL: http://gateway:4000
       INGEST_TOKEN: dev-ingest-token
+      JWT_SECRET: dev-jwt-secret-change-me
     ports:
       - "8080:8080"
     depends_on:
@@ -30,9 +31,11 @@ services:
       dockerfile: gateway/Dockerfile
     environment:
       GATEWAY_PORT: "4000"
-      PARSER_PATH: /app/iot-parser
       API_URL: http://api:8080
       INGEST_TOKEN: dev-ingest-token
+      MQTT_ENABLED: "false"
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
     ports:
       - "4000:4000"
     depends_on:
@@ -42,11 +45,82 @@ services:
     build:
       context: .
       dockerfile: web/Dockerfile
+      args:
+        VITE_AI_URL: http://localhost:8095
+        VITE_MODBUS_URL: http://localhost:8090
     ports:
       - "80:80"
     depends_on:
       - api
       - gateway
 
+  modbus-poller:
+    build:
+      context: .
+      dockerfile: api/Dockerfile.modbus-poller
+    environment:
+      MODBUS_CONFIG: /etc/iot/modbus.json
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./api/cmd/modbus-poller/modbus.example.json:/etc/iot/modbus.json
+    depends_on:
+      - api
+
+  automation:
+    build:
+      context: .
+      dockerfile: automation/Dockerfile
+    environment:
+      AUTOMATION_CONFIG: /etc/iot/automation.json
+    volumes:
+      - ./automation/automation.example.json:/etc/iot/automation.json
+    depends_on:
+      - api
+      - modbus-poller
+
+  alerts:
+    build:
+      context: .
+      dockerfile: alerts/Dockerfile
+    environment:
+      ALERTS_CONFIG: /etc/iot/alerts.json
+      TELEGRAM_TOKEN: ""
+      TELEGRAM_CHAT: ""
+    volumes:
+      - ./alerts/alerts.example.json:/etc/iot/alerts.json
+    depends_on:
+      - api
+
+  ai:
+    build:
+      context: .
+      dockerfile: ai/Dockerfile
+    environment:
+      AI_PORT: "8095"
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: llama3.1
+      DATABASE_URL: postgres://iot:iot@postgres:5432/iot?sslmode=disable
+    ports:
+      - "8095:8095"
+    depends_on:
+      - postgres
+      - ollama
+
+  # локальная LLM (опционально, подключается к ai-сервису)
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+
+  # MQTT-брокер для беспроводных датчиков (опционально)
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+
 volumes:
   pgdata:
+  ollama:

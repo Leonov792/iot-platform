@@ -8,9 +8,13 @@ import (
 
 type ctxKey string
 
-const userIDKey ctxKey = "userID"
+const (
+	userIDKey ctxKey = "userID"
+	roleKey   ctxKey = "role"
+	homeIDKey ctxKey = "homeID"
+)
 
-// RequireAuth проверяет Bearer-токен и кладёт user_id в контекст.
+// RequireAuth проверяет Bearer-токен и кладёт user_id, роль и home_id в контекст.
 // если токена нет или он кривой — сразу 401, дальше не пускаем
 func RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -21,13 +25,15 @@ func RequireAuth(next http.Handler) http.Handler {
 		}
 
 		raw := strings.TrimPrefix(header, "Bearer ")
-		userID, err := ParseToken(raw)
+		userID, role, homeID, err := ParseToken(raw)
 		if err != nil {
 			http.Error(w, `{"error":"токен протух или кривой"}`, http.StatusUnauthorized)
 			return
 		}
 
 		ctx := context.WithValue(r.Context(), userIDKey, userID)
+		ctx = context.WithValue(ctx, roleKey, role)
+		ctx = context.WithValue(ctx, homeIDKey, homeID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -35,5 +41,17 @@ func RequireAuth(next http.Handler) http.Handler {
 // UserIDFromCtx вытаскивает user_id, который middleware туда положил
 func UserIDFromCtx(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(userIDKey).(string)
+	return v, ok
+}
+
+// RoleFromCtx вытаскивает роль пользователя
+func RoleFromCtx(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(roleKey).(string)
+	return v, ok
+}
+
+// HomeIDFromCtx вытаскивает home_id (id владельца «дома»)
+func HomeIDFromCtx(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(homeIDKey).(string)
 	return v, ok
 }

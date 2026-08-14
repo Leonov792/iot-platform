@@ -63,12 +63,16 @@ docker compose up --build
 | Go API | http://localhost:8080 |
 | Гейтвей (WS) | ws://localhost:4000 |
 
-Затем зарегистрируйся на фронте, создай устройство (`sensor`) и запусти эмулятор:
+Затем зарегистрируйся на фронте, создай устройство (`sensor`), выпусти для него device token
+(через `POST /api/v1/devices/{id}/token`) и запусти эмулятор с этим токеном:
 
 ```bash
 cd tools/sensor-emu
-go run . -id sensor-1 -type sensor -url ws://localhost:4000/ws/device/
+go run . -id sensor-1 -type sensor -token <DEVICE_TOKEN> -url ws://localhost:4000/ws/device/
 ```
+
+Device token обязателен: гейтвей проверяет его на WebSocket-хендшейке. Для локальной
+разработки проверку можно выключить флагом `DEVICE_AUTH_ENABLED=false` (env гейтвея).
 
 ## Разработка (вручную)
 
@@ -81,14 +85,10 @@ docker run -d --name iot-pg -e POSTGRES_USER=iot -e POSTGRES_PASSWORD=iot -e POS
 # 2. go api
 cd api && go run ./cmd/api
 
-# 3. rust парсер
-cd parser && cargo build --release
+# 3. elixir гейтвей (rustler сам соберёт rust NIF из ../parser при mix compile)
+cd gateway && mix deps.get && mix run --no-halt
 
-# 4. elixir гейтвей
-cd gateway && mix deps.get
-PARSER_PATH=../parser/target/release/iot-parser mix run --no-halt
-
-# 5. фронт
+# 4. фронт
 cd web && npm install && npm run dev
 ```
 
@@ -114,17 +114,53 @@ CI гоняет всё это на каждый push и PR (см. `.github/workf
 | POST | `/api/v1/auth/register` | Регистрация → JWT |
 | POST | `/api/v1/auth/login` | Вход → JWT |
 | GET/POST | `/api/v1/devices` | Список / создание устройства (JWT) |
-| PUT/DELETE | `/api/v1/devices/{id}` | Обновление / удаление (JWT) |
-| POST | `/api/v1/devices/{id}/command` | Команда (вкл/выкл/яркость/температура) |
+| PUT/DELETE | `/api/v1/devices/{id}` | Обновление / удаление (JWT, owner) |
+| POST | `/api/v1/devices/{id}/command` | Команда (вкл/выкл/яркость/температура/цвет) |
 | GET | `/api/v1/devices/{id}/telemetry` | История для графика |
+| POST | `/api/v1/devices/{id}/token` | Выпуск device token (owner) |
+| GET/POST | `/api/v1/users` | Члены дома (owner) |
+| PUT | `/api/v1/users/{id}/role` | Смена роли (owner) |
+| PUT | `/api/v1/users/{id}/schedule` | Расписание доступа (owner) |
 | POST | `/api/v1/telemetry` | Ингест телеметрии (заголовок `X-Ingest-Token`) |
+| POST | `/internal/device/{id}/verify` | Проверка device token (гейтвей) |
+| GET | `/internal/telemetry/{id}/latest` | Последняя телеметрия (автоматизация/ИИ) |
 
 WebSocket гейтвея:
 
 | Путь | Назначение |
 |---|---|
-| `GET /ws/device/{id}` | Сенсор шлёт сюда бинарные кадры |
+| `GET /ws/device/{id}` | Сенсор шлёт сюда бинарные кадры (device token) |
 | `GET /ws/dashboard` | Фронт/мобилка подписываются на телеметрию |
+
+## Драйверы протоколов (Modbus TCP / MQTT)
+
+**Modbus TCP** — оборудование бассейна/спортзала (насосы фильтрации, дозаторы хлора/pH,
+клапаны долива, вытяжка). Живёт в `api/cmd/modbus-poller`:
+
+- читает Holding/Input Registers и Coils (датчики pH, ORP, уровня воды, влажности);
+- пишет реле/клапаны через `POST /internal/write` (`X-Write-Token`);
+- отдаёт телеметрию в общую шину (ingest-ручка API);
+- отдаёт лог операций на `GET /logs` (для админки).
+
+Конфиг — JSON-файл (`MODBUS_CONFIG`, пример `api/cmd/modbus-poller/modbus.example.json`):
+устройства, точки (register/address/scale) и реле.
+
+**MQTT** — беспроводные датчики через сторонние шлюзы (Zigbee/Tuya). Встроен в гейтвей
+на базе `tortoise` (`gateway/lib/gateway/mqtt.ex`):
+
+- подписывается на топики `iot/+/telemetry` (настраивается через `MQTT_TOPICS`);
+- сообщения шлюза перекладываются в ту же PubSub-шину + сохраняются в API;
+- включается через `MQTT_ENABLED=true`, брокер — `MQTT_HOST`/`MQTT_PORT` (EMQX/Mosquitto).
+
+## B2B/Premium сервисы
+
+| Сервис | Стек | Что делает |
+|---|---|---|
+| `automation/` | Go | Rules Engine: `IF [Condition] THEN [Action]` (долив воды, хлор/pH, климат) |
+| `alerts/` | Go | Push-уведомления (FCM + Telegram) о критических авариях |
+| `ai/` | Go | Ollama-клиент, парсинг намерений в JSON, предиктивный анализ |
+| `api/cmd/modbus-poller` | Go | Драйвер Modbus TCP (датчики химии бассейна, реле/клапаны) |
+| `gateway` | Elixir | + MQTT-клиент (tortoise) для Zigbee/Tuya-шлюзов |
 
 ## Бинарный протокол
 
@@ -149,12 +185,15 @@ kind = 0x01 → телеметрия: temp(f32 LE), humidity(f32 LE), battery(u8
 
 ```
 iot-platform/
-├── api/            # Go: REST API + авторизация + БД
-├── gateway/        # Elixir: WebSocket-шина + PubSub
-├── parser/         # Rust: парсер бинарной телеметрии
-├── web/            # Vue 3: дашборд
+├── api/            # Go: REST API + RBAC + БД (+ modbus-poller)
+├── gateway/        # Elixir: WebSocket-шина + PubSub + Rustler NIF + MQTT
+├── parser/         # Rust: парсер бинарной телеметрии (lib для NIF + bin)
+├── automation/     # Go: rules engine
+├── alerts/         # Go: уведомления (FCM + Telegram)
+├── ai/             # Go: локальный ИИ (Ollama)
+├── web/            # Vue 3: дашборд + админка
 ├── mobile/
-│   ├── ios/        # SwiftUI-клиент
+│   ├── ios/        # SwiftUI-клиент (color wheel, конструктор автоматизаций)
 │   └── android/    # Kotlin/Compose-клиент
 ├── tools/sensor-emu/  # эмулятор датчика
 ├── docker-compose.yml

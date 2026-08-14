@@ -1,5 +1,5 @@
 defmodule Gateway.ParserTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
   defp telemetry_frame(id) do
     idb = String.pad_trailing(id, 16, <<0>>)
@@ -15,18 +15,22 @@ defmodule Gateway.ParserTest do
     frame <> <<crc>>
   end
 
-  defp binary? do
-    base = Application.get_env(:gateway, :parser_path, "iot-parser")
-    File.regular?(base) or File.regular?(base <> ".exe")
+  test "NIF парсит валидный кадр телеметрии" do
+    {:ok, json} = Gateway.Parser.parse(telemetry_frame("sensor-1"))
+    assert json =~ ~s("device_id":"sensor-1")
+    assert json =~ ~s("temp":21.5)
+    assert json =~ ~s("battery":87)
   end
 
-  test "парсит валидный кадр телеметрии" do
-    if binary?() do
-      {:ok, json} = Gateway.Parser.parse(telemetry_frame("sensor-1"))
-      assert json =~ ~s("device_id":"sensor-1")
-      assert json =~ ~s("temp":21.5)
-    else
-      IO.puts("пропускаю parser test: бинарник не собран")
-    end
+  test "NIF возвращает ошибку на битый crc" do
+    frame = telemetry_frame("sensor-1")
+    n = byte_size(frame)
+    corrupted = binary_part(frame, 0, n - 1) <> <<Bitwise.bxor(:binary.at(frame, n - 1), 0xFF)>>
+
+    assert {:error, _} = Gateway.Parser.parse(corrupted)
+  end
+
+  test "NIF возвращает ошибку на короткий кадр" do
+    assert {:error, _} = Gateway.Parser.parse(<<0xAB, 0xCD>>)
   end
 end

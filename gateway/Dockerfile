@@ -1,15 +1,14 @@
-# этап 1: собираем rust-парсер
-FROM rust:1.96-slim AS parser
-WORKDIR /b
-COPY parser/ ./parser/
-RUN cd parser && cargo build --release
+# гейтвей с Rustler NIF: для сборки нужен и rust (NIF), и elixir.
+# rustler-компилятор запускает cargo для крейта gateway_parser (лежит в ../parser).
 
-# этап 2: эликсир-гейтвей
 FROM elixir:1.20-slim
 
-# slim-образ без CA-сертификатов, а mix deps.get ходит по https на hex.pm
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# CA-серты для hex.pm + инструменты для сборки нативного кода
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl build-essential \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 WORKDIR /app
 
@@ -17,10 +16,11 @@ WORKDIR /app
 COPY gateway/mix.exs gateway/mix.lock ./
 RUN mix deps.get
 
+# исходники rust-крейта для NIF (mix compile соберёт его из ../parser)
+COPY parser/ /parser/
+
 COPY gateway/ ./
 RUN mix compile
-
-COPY --from=parser /b/parser/target/release/iot-parser /app/iot-parser
 
 ENV MIX_ENV=prod
 EXPOSE 4000

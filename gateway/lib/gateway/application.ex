@@ -8,7 +8,7 @@ defmodule Gateway.Application do
     children = [
       {Finch, name: Gateway.Finch},
       Gateway.Registry,
-      Gateway.Parser,
+      Gateway.MQTT,
       {Bandit, plug: Gateway.Router, scheme: :http, port: port, ip: {0, 0, 0, 0}}
     ]
 
