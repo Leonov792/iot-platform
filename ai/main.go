@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -109,6 +109,8 @@ func (s *server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
 	configPath := flag.String("config", "", "не используется, всё из env")
 	_ = configPath
 	flag.Parse()
@@ -123,7 +125,7 @@ func main() {
 		pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 		cancel()
 		if err != nil {
-			log.Printf("[ai] не подключился к базе (предиктив отключён): %v", err)
+			slog.Warn("не подключился к базе (предиктив отключён)", "err", err)
 		} else {
 			predictor = NewPredictor(pool)
 			defer pool.Close()
@@ -150,14 +152,15 @@ func main() {
 	defer stop()
 
 	go func() {
-		log.Printf("[ai] слушаю на %s (модель %s, ollama %s)", srv.Addr, cfg.Model, cfg.OllamaURL)
+		slog.Info("слушаю", "addr", srv.Addr, "model", cfg.Model, "ollama", cfg.OllamaURL)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("[ai] сервер сдох: %v", err)
+			slog.Error("сервер сдох", "err", err)
+			os.Exit(1)
 		}
 	}()
 
 	<-ctx.Done()
-	log.Println("[ai] гашу...")
+	slog.Info("гашу...")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)

@@ -13,7 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -223,7 +223,7 @@ func (p *poller) pollOne(d Device) {
 	for _, pt := range d.Points {
 		v, err := readPoint(c, pt)
 		if err != nil {
-			log.Printf("[modbus] %s: точка %s не прочиталась: %v", d.ID, pt.Name, err)
+			slog.Warn("точка не прочиталась", "device", d.ID, "point", pt.Name, "err", err)
 			p.record("read", d.ID, pt.Name, nil, err)
 			continue
 		}
@@ -246,12 +246,12 @@ func (p *poller) pollOne(d Device) {
 
 	resp, err := p.http.Do(req)
 	if err != nil {
-		log.Printf("[modbus] %s: не достучался до api: %v", d.ID, err)
+		slog.Warn("не достучался до api", "device", d.ID, "err", err)
 		return
 	}
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusNoContent {
-		log.Printf("[modbus] %s: api вернул %d на телеметрию", d.ID, resp.StatusCode)
+		slog.Warn("api вернул ошибку на телеметрию", "device", d.ID, "status", resp.StatusCode)
 	}
 }
 
@@ -299,13 +299,13 @@ func (p *poller) handleWrite(w http.ResponseWriter, r *http.Request) {
 		err = errors.New("неизвестный тип реле " + relay.Register)
 	}
 	if err != nil {
-		log.Printf("[modbus] %s/%s: запись не прошла: %v", req.DeviceID, req.Relay, err)
+		slog.Error("запись не прошла", "device", req.DeviceID, "relay", req.Relay, "err", err)
 		p.record("write", req.DeviceID, req.Relay, req.Value, err)
 		writeErr(w, http.StatusInternalServerError, "запись не прошла")
 		return
 	}
 
-	log.Printf("[modbus] %s/%s -> %v", req.DeviceID, req.Relay, req.Value)
+	slog.Info("записал реле", "device", req.DeviceID, "relay", req.Relay, "value", req.Value)
 	p.record("write", req.DeviceID, req.Relay, req.Value, nil)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -325,12 +325,15 @@ func (p *poller) handleLogs(w http.ResponseWriter, _ *http.Request) {
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
 	configPath := flag.String("config", envOr("MODBUS_CONFIG", "modbus.json"), "путь к конфигу")
 	flag.Parse()
 
 	cfg, err := loadConfig(*configPath)
 	if err != nil {
-		log.Fatalf("не прочитал конфиг: %v", err)
+		slog.Error("не прочитал конфиг", "err", err)
+		os.Exit(1)
 	}
 
 	p := newPoller(cfg, &http.Client{Timeout: 5 * time.Second})
@@ -349,9 +352,10 @@ func main() {
 
 	srv := &http.Server{Addr: cfg.Listen, Handler: mux}
 	go func() {
-		log.Printf("modbus-poller слушает на %s", cfg.Listen)
+		slog.Info("modbus-poller слушает", "addr", cfg.Listen)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("http сдох: %v", err)
+			slog.Error("http сдох", "err", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -359,12 +363,12 @@ func main() {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	log.Printf("modbus-poller запущен, устройств: %d, интервал: %s", len(cfg.Devices), interval)
+	slog.Info("modbus-poller запущен", "devices", len(cfg.Devices), "interval", interval)
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("гашу poller...")
+			slog.Info("гашу poller...")
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			_ = srv.Shutdown(shutdownCtx)
 			cancel()

@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -162,12 +162,15 @@ func (r *telemetryReader) latest(ctx context.Context, deviceID string) (map[stri
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
 	configPath := flag.String("config", envOr("AUTOMATION_CONFIG", "automation.json"), "путь к конфигу")
 	flag.Parse()
 
 	cfg, err := loadConfig(*configPath)
 	if err != nil {
-		log.Fatalf("не прочитал конфиг: %v", err)
+		slog.Error("не прочитал конфиг", "err", err)
+		os.Exit(1)
 	}
 
 	httpClient := &http.Client{Timeout: 5 * time.Second}
@@ -202,9 +205,9 @@ func main() {
 			engine.SetRules(newRules)
 			cfg.Rules = newRules
 			if err := persistConfig(*configPath, cfg); err != nil {
-				log.Printf("[automation] не сохранил правила на диск: %v", err)
+				slog.Error("не сохранил правила на диск", "err", err)
 			}
-			log.Printf("[automation] правила обновлены: %d", len(newRules))
+			slog.Info("правила обновлены", "count", len(newRules))
 			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		default:
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "метод не тот"})
@@ -217,13 +220,14 @@ func main() {
 
 	srv := &http.Server{Addr: cfg.Listen, Handler: mux}
 	go func() {
-		log.Printf("[automation] http на %s", srv.Addr)
+		slog.Info("http слушает", "addr", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("[automation] http сдох: %v", err)
+			slog.Error("http сдох", "err", err)
+			os.Exit(1)
 		}
 	}()
 
-	log.Printf("automation запущен: %d правил, интервал %s", len(cfg.Rules), interval)
+	slog.Info("automation запущен", "rules", len(cfg.Rules), "interval", interval)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -231,7 +235,7 @@ func main() {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("гашу automation...")
+			slog.Info("гашу automation...")
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			_ = srv.Shutdown(shutdownCtx)
 			cancel()

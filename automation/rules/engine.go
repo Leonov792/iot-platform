@@ -1,7 +1,7 @@
 package rules
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -86,7 +86,7 @@ func (e *Engine) fire(r Rule, now time.Time) {
 	e.lastFire[r.ID] = now
 	e.mu.Unlock()
 
-	log.Printf("[automation] правило %q (%s) сработало", r.Name, r.ID)
+	slog.Info("правило сработало", "rule", r.Name, "id", r.ID)
 	for _, a := range r.Actions {
 		e.exec(a)
 	}
@@ -96,7 +96,7 @@ func (e *Engine) exec(a Action) {
 	switch a.Type {
 	case "modbus_write":
 		if err := e.executor.ModbusWrite(a.DeviceID, a.Relay, a.ValueBool()); err != nil {
-			log.Printf("[automation] modbus_write %s/%s: %v", a.DeviceID, a.Relay, err)
+			slog.Error("modbus_write не прошёл", "device", a.DeviceID, "relay", a.Relay, "err", err)
 			return
 		}
 		if a.OffAfter != "" {
@@ -105,7 +105,7 @@ func (e *Engine) exec(a Action) {
 				deviceID, relay := a.DeviceID, a.Relay
 				time.AfterFunc(d, func() {
 					if err := e.executor.ModbusWrite(deviceID, relay, false); err != nil {
-						log.Printf("[automation] modbus_write OFF %s/%s: %v", deviceID, relay, err)
+						slog.Error("modbus_write OFF не прошёл", "device", deviceID, "relay", relay, "err", err)
 					}
 				})
 			}
@@ -113,11 +113,11 @@ func (e *Engine) exec(a Action) {
 
 	case "command":
 		if err := e.executor.Command(a.DeviceID, a.Action, a.Value); err != nil {
-			log.Printf("[automation] command %s/%s: %v", a.DeviceID, a.Action, err)
+			slog.Error("command не прошла", "device", a.DeviceID, "action", a.Action, "err", err)
 		}
 
 	default:
-		log.Printf("[automation] неизвестный тип действия %q", a.Type)
+		slog.Warn("неизвестный тип действия", "type", a.Type)
 	}
 }
 

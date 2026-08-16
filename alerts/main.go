@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -92,7 +92,7 @@ func (m *MultiNotifier) Send(title, body string) error {
 	var first error
 	for _, n := range m.notifiers {
 		if err := n.Send(title, body); err != nil {
-			log.Printf("[alerts] канал не доставил: %v", err)
+			slog.Warn("канал не доставил", "err", err)
 			first = err
 		}
 	}
@@ -130,7 +130,7 @@ func (w *watcher) evaluate(states map[string]map[string]float64, now time.Time) 
 		if body == "" {
 			body = a.DeviceID + ":" + a.Field + " " + a.Op + " " + formatFloat(a.Value)
 		}
-		log.Printf("[alerts] %s — %s", title, body)
+		slog.Warn("алерт", "severity", a.Severity, "title", title, "body", body)
 		_ = w.notifier.Send(title, body)
 	}
 }
@@ -222,12 +222,15 @@ func (r *reader) latest(ctx context.Context, deviceID string) (map[string]float6
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
 	configPath := flag.String("config", envOr("ALERTS_CONFIG", "alerts.json"), "путь к конфигу")
 	flag.Parse()
 
 	cfg, err := loadConfig(*configPath)
 	if err != nil {
-		log.Fatalf("не прочитал конфиг: %v", err)
+		slog.Error("не прочитал конфиг", "err", err)
+		os.Exit(1)
 	}
 
 	httpClient := &http.Client{Timeout: 10 * time.Second}
@@ -239,13 +242,13 @@ func main() {
 	if cfg.FCMCreds != "" {
 		fcm, err := newFCMNotifier(cfg.FCMCreds, cfg.FCMTopic, httpClient)
 		if err != nil {
-			log.Printf("[alerts] не поднял FCM (пропускаю): %v", err)
+			slog.Warn("не поднял FCM (пропускаю)", "err", err)
 		} else {
 			notifiers = append(notifiers, fcm)
 		}
 	}
 	if len(notifiers) == 0 {
-		log.Println("[alerts] предупреждение: ни один канал уведомлений не настроен")
+		slog.Warn("ни один канал уведомлений не настроен")
 	}
 
 	r := newReader(cfg.APIURL, cfg.IngestToken, httpClient)
@@ -261,7 +264,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	log.Printf("alerts запущен: %d алертов, %d устройств", len(cfg.Alerts), len(devices))
+	slog.Info("alerts запущен", "alerts", len(cfg.Alerts), "devices", len(devices))
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -269,7 +272,7 @@ func main() {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("гашу alerts...")
+			slog.Info("гашу alerts...")
 			return
 		case now := <-ticker.C:
 			states := make(map[string]map[string]float64, len(devices))

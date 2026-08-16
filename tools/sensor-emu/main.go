@@ -4,10 +4,11 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"flag"
-	"log"
+	"log/slog"
 	"math"
 	"math/rand"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -40,6 +41,8 @@ type deviceState struct {
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
 	flag.Parse()
 
 	st := deviceState{on: false, brightness: 100, target: 22, temp: 21.5, humidity: 45, battery: 100}
@@ -47,7 +50,7 @@ func main() {
 
 	for {
 		if err := run(url, &st); err != nil {
-			log.Printf("соединение отвалилось: %v, переподключаюсь через 2с", err)
+			slog.Warn("соединение отвалилось", "err", err)
 		}
 		time.Sleep(2 * time.Second)
 	}
@@ -64,7 +67,7 @@ func run(url string, st *deviceState) error {
 		return err
 	}
 	defer c.Close()
-	log.Printf("подключился к %s как %s", url, *devType)
+	slog.Info("подключился", "url", url, "type", *devType)
 
 	// читаем команды в фоне
 	go func() {
@@ -109,7 +112,7 @@ func handleCommand(st *deviceState, msg []byte) {
 		Value  float64 `json:"value"`
 	}
 	if err := json.Unmarshal(msg, &cmd); err != nil {
-		log.Printf("не понял команду: %s", msg)
+		slog.Warn("не понял команду", "msg", string(msg))
 		return
 	}
 
@@ -125,8 +128,7 @@ func handleCommand(st *deviceState, msg []byte) {
 		st.target = cmd.Value
 	}
 
-	log.Printf("команда %s (value=%.0f), состояние: on=%v brightness=%d target=%.1f",
-		cmd.Action, cmd.Value, st.on, st.brightness, st.target)
+	slog.Info("команда", "action", cmd.Action, "value", cmd.Value, "on", st.on, "brightness", st.brightness, "target", st.target)
 }
 
 func buildFrame(id string, st *deviceState) []byte {

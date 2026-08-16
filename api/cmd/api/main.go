@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,6 +19,9 @@ import (
 )
 
 func main() {
+	// структурный JSON-логгер — обязательно для продакшена (см. README, «Логирование»)
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
 	cfg := config.Load()
 	auth.SetSecret([]byte(cfg.JWTSecret))
 
@@ -28,12 +31,14 @@ func main() {
 
 	pool, err := db.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("не подключился к постгресу: %v", err)
+		slog.Error("не подключился к постгресу", "err", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
 
 	if err := db.Migrate(ctx, pool); err != nil {
-		log.Fatalf("миграции не прошли: %v", err)
+		slog.Error("миграции не прошли", "err", err)
+		os.Exit(1)
 	}
 
 	devices := store.NewDeviceStore(pool)
@@ -57,18 +62,19 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("поднимаю http на %s", srv.Addr)
+		slog.Info("поднимаю http", "addr", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("сервер сдох: %v", err)
+			slog.Error("сервер сдох", "err", err)
+			os.Exit(1)
 		}
 	}()
 
 	<-ctx.Done()
-	log.Println("гашу сервер...")
+	slog.Info("гашу сервер...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("не успел погаситься нормально: %v", err)
+		slog.Error("не успел погаситься нормально", "err", err)
 	}
 }
