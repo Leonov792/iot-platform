@@ -22,9 +22,9 @@ type Condition struct {
 type Action struct {
 	Type     string `json:"type"`
 	DeviceID string `json:"device_id"`
-	Relay    string `json:"relay,omitempty"`    // для modbus_write
-	Action   string `json:"action,omitempty"`   // для command
-	Value    any    `json:"value,omitempty"`    // значение (bool/число/строка)
+	Relay    string `json:"relay,omitempty"`     // для modbus_write
+	Action   string `json:"action,omitempty"`    // для command
+	Value    any    `json:"value,omitempty"`     // значение (bool/число/строка)
 	OffAfter string `json:"off_after,omitempty"` // "30s" — выключить реле через N секунд
 }
 

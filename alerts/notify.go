@@ -21,8 +21,11 @@ type telegramNotifier struct {
 	http  *http.Client
 }
 
-func newTelegramNotifier(token, chat string) *telegramNotifier {
-	return &telegramNotifier{token: token, chat: chat, http: &http.Client{Timeout: 10 * time.Second}}
+func newTelegramNotifier(token, chat string, client *http.Client) *telegramNotifier {
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
+	return &telegramNotifier{token: token, chat: chat, http: client}
 }
 
 func (t *telegramNotifier) Send(title, body string) error {
@@ -63,7 +66,7 @@ type serviceAccount struct {
 	ProjectID string `json:"project_id"`
 }
 
-func newFCMNotifier(credsPath, topic string) (*fcmNotifier, error) {
+func newFCMNotifier(credsPath, topic string, client *http.Client) (*fcmNotifier, error) {
 	key, err := os.ReadFile(credsPath)
 	if err != nil {
 		return nil, err
@@ -83,11 +86,23 @@ func newFCMNotifier(credsPath, topic string) (*fcmNotifier, error) {
 		return nil, err
 	}
 
+	c := oauth2.NewClient(context.Background(), cfg.TokenSource(context.Background()))
+	// явный таймаут: из внедрённого клиента, иначе дефолт 10s (иначе горутина может висеть вечно)
+	c.Timeout = timeoutOf(client)
+
 	return &fcmNotifier{
 		project: sa.ProjectID,
 		topic:   topic,
-		client:  oauth2.NewClient(context.Background(), cfg.TokenSource(context.Background())),
+		client:  c,
 	}, nil
+}
+
+// timeoutOf возвращает таймаут внедрённого клиента или безопасный дефолт 10s.
+func timeoutOf(client *http.Client) time.Duration {
+	if client != nil && client.Timeout > 0 {
+		return client.Timeout
+	}
+	return 10 * time.Second
 }
 
 func (f *fcmNotifier) Send(title, body string) error {

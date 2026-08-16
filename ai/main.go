@@ -115,7 +115,7 @@ func main() {
 
 	cfg := loadConfig()
 
-	ollama := NewOllamaClient(cfg.OllamaURL, cfg.Model)
+	ollama := NewOllamaClient(cfg.OllamaURL, cfg.Model, &http.Client{Timeout: 120 * time.Second})
 
 	var predictor *Predictor
 	if cfg.DatabaseURL != "" {

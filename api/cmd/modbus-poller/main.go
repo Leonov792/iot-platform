@@ -93,12 +93,15 @@ type poller struct {
 	logs    *logRing
 }
 
-func newPoller(cfg Config) *poller {
+func newPoller(cfg Config, client *http.Client) *poller {
+	if client == nil {
+		client = &http.Client{Timeout: 5 * time.Second}
+	}
 	p := &poller{
 		cfg:     cfg,
 		clients: map[string]*modbus.Client{},
 		relays:  map[string]map[string]Relay{},
-		http:    &http.Client{Timeout: 5 * time.Second},
+		http:    client,
 		logs:    newLogRing(200),
 	}
 	for _, d := range cfg.Devices {
@@ -330,7 +333,7 @@ func main() {
 		log.Fatalf("не прочитал конфиг: %v", err)
 	}
 
-	p := newPoller(cfg)
+	p := newPoller(cfg, &http.Client{Timeout: 5 * time.Second})
 	defer p.close()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

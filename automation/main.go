@@ -66,6 +66,18 @@ type httpExecutor struct {
 	client     *http.Client
 }
 
+func newHTTPExecutor(modbusURL, modbusTok, gatewayURL string, client *http.Client) *httpExecutor {
+	if client == nil {
+		client = &http.Client{Timeout: 5 * time.Second}
+	}
+	return &httpExecutor{
+		modbusURL:  modbusURL,
+		modbusTok:  modbusTok,
+		gatewayURL: gatewayURL,
+		client:     client,
+	}
+}
+
 func (h *httpExecutor) post(url, token string, body any) error {
 	b, err := json.Marshal(body)
 	if err != nil {
@@ -106,6 +118,13 @@ type telemetryReader struct {
 	apiURL string
 	token  string
 	client *http.Client
+}
+
+func newTelemetryReader(apiURL, token string, client *http.Client) *telemetryReader {
+	if client == nil {
+		client = &http.Client{Timeout: 5 * time.Second}
+	}
+	return &telemetryReader{apiURL: apiURL, token: token, client: client}
 }
 
 // latest возвращает map[field]float64 последней телеметрии устройства.
@@ -151,9 +170,9 @@ func main() {
 		log.Fatalf("не прочитал конфиг: %v", err)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
-	executor := &httpExecutor{modbusURL: cfg.ModbusURL, modbusTok: cfg.ModbusToken, gatewayURL: cfg.GatewayURL, client: client}
-	reader := &telemetryReader{apiURL: cfg.APIURL, token: cfg.IngestToken, client: client}
+	httpClient := &http.Client{Timeout: 5 * time.Second}
+	executor := newHTTPExecutor(cfg.ModbusURL, cfg.ModbusToken, cfg.GatewayURL, httpClient)
+	reader := newTelemetryReader(cfg.APIURL, cfg.IngestToken, httpClient)
 
 	engine := rules.NewEngine(cfg.Rules, executor)
 	interval, err := time.ParseDuration(cfg.PollInterval)

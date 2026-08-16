@@ -17,10 +17,18 @@ type Client struct {
 	client *http.Client
 }
 
-func NewClient(url string) *Client {
+// defaultTimeout — таймаут, если клиент не передали (nil), чтобы не зависнуть навсегда.
+const defaultTimeout = 5 * time.Second
+
+// NewClient собирает клиент гейтвея. client внедряется снаружи (DI); при nil
+// подставляется безопасный дефолтный *http.Client с явным таймаутом.
+func NewClient(url string, client *http.Client) *Client {
+	if client == nil {
+		client = &http.Client{Timeout: defaultTimeout}
+	}
 	return &Client{
 		url:    url,
-		client: &http.Client{Timeout: 5 * time.Second},
+		client: client,
 	}
 }
 

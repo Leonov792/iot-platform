@@ -7,9 +7,9 @@ import (
 
 func TestMatch(t *testing.T) {
 	cases := []struct {
-		op          string
-		got, want   float64
-		expected    bool
+		op        string
+		got, want float64
+		expected  bool
 	}{
 		{"gt", 10, 5, true},
 		{"lt", 10, 5, false},
@@ -55,8 +55,8 @@ func TestEngineFiresOnCondition(t *testing.T) {
 	ex := &recordingExecutor{}
 	eng := NewEngine([]Rule{
 		{
-			ID:   "r1",
-			Name: "влажность",
+			ID:        "r1",
+			Name:      "влажность",
 			Condition: Condition{DeviceID: "gym-climat", Field: "humidity", Op: "gt", Value: 70},
 			Actions:   []Action{{Type: "modbus_write", DeviceID: "gym-climat", Relay: "exhaust_fan", Value: true}},
 			Cooldown:  "1m",

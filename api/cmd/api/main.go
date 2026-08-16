@@ -41,7 +41,7 @@ func main() {
 	telemetry := store.NewTelemetryStore(pool)
 	commands := store.NewCommandLogStore(pool)
 
-	gw := gateway.NewClient(cfg.GatewayURL)
+	gw := gateway.NewClient(cfg.GatewayURL, &http.Client{Timeout: 5 * time.Second})
 
 	h := api.NewHandler(devices, gw, users, commands, cfg.IngestToken)
 	ah := api.NewAuthHandler(users)

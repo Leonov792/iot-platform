@@ -16,11 +16,14 @@ type OllamaClient struct {
 	http    *http.Client
 }
 
-func NewOllamaClient(baseURL, model string) *OllamaClient {
+func NewOllamaClient(baseURL, model string, client *http.Client) *OllamaClient {
+	if client == nil {
+		client = &http.Client{Timeout: 120 * time.Second}
+	}
 	return &OllamaClient{
 		baseURL: baseURL,
 		model:   model,
-		http:    &http.Client{Timeout: 120 * time.Second},
+		http:    client,
 	}
 }
 

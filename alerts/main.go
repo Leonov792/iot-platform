@@ -30,14 +30,14 @@ type Alert struct {
 }
 
 type Config struct {
-	APIURL        string   `json:"api_url"`
-	IngestToken   string   `json:"ingest_token"`
-	PollInterval  string   `json:"poll_interval"`
-	TelegramToken string   `json:"telegram_token,omitempty"`
-	TelegramChat  string   `json:"telegram_chat,omitempty"`
-	FCMCreds      string   `json:"fcm_credentials,omitempty"` // путь к service account json
-	FCMTopic      string   `json:"fcm_topic,omitempty"`
-	Alerts        []Alert  `json:"alerts"`
+	APIURL        string  `json:"api_url"`
+	IngestToken   string  `json:"ingest_token"`
+	PollInterval  string  `json:"poll_interval"`
+	TelegramToken string  `json:"telegram_token,omitempty"`
+	TelegramChat  string  `json:"telegram_chat,omitempty"`
+	FCMCreds      string  `json:"fcm_credentials,omitempty"` // путь к service account json
+	FCMTopic      string  `json:"fcm_topic,omitempty"`
+	Alerts        []Alert `json:"alerts"`
 }
 
 func loadConfig(path string) (Config, error) {
@@ -161,6 +161,13 @@ type reader struct {
 	client *http.Client
 }
 
+func newReader(apiURL, token string, client *http.Client) *reader {
+	if client == nil {
+		client = &http.Client{Timeout: 5 * time.Second}
+	}
+	return &reader{apiURL: apiURL, token: token, client: client}
+}
+
 func (r *reader) latest(ctx context.Context, deviceID string) (map[string]float64, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		r.apiURL+"/internal/telemetry/"+deviceID+"/latest", nil)
@@ -203,12 +210,14 @@ func main() {
 		log.Fatalf("не прочитал конфиг: %v", err)
 	}
 
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+
 	notifiers := make([]Notifier, 0, 2)
 	if cfg.TelegramToken != "" && cfg.TelegramChat != "" {
-		notifiers = append(notifiers, newTelegramNotifier(cfg.TelegramToken, cfg.TelegramChat))
+		notifiers = append(notifiers, newTelegramNotifier(cfg.TelegramToken, cfg.TelegramChat, httpClient))
 	}
 	if cfg.FCMCreds != "" {
-		fcm, err := newFCMNotifier(cfg.FCMCreds, cfg.FCMTopic)
+		fcm, err := newFCMNotifier(cfg.FCMCreds, cfg.FCMTopic, httpClient)
 		if err != nil {
 			log.Printf("[alerts] не поднял FCM (пропускаю): %v", err)
 		} else {
@@ -219,8 +228,7 @@ func main() {
 		log.Println("[alerts] предупреждение: ни один канал уведомлений не настроен")
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
-	r := &reader{apiURL: cfg.APIURL, token: cfg.IngestToken, client: client}
+	r := newReader(cfg.APIURL, cfg.IngestToken, httpClient)
 	w := &watcher{alerts: cfg.Alerts, notifier: &MultiNotifier{notifiers: notifiers}, lastSent: map[string]time.Time{}}
 
 	interval, err := time.ParseDuration(cfg.PollInterval)
