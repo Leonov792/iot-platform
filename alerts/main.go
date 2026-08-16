@@ -49,6 +49,11 @@ func loadConfig(path string) (Config, error) {
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return cfg, err
 	}
+
+	// секреты удобнее задавать через env, а не хранить в json-файле.
+	// env переопределяет значение из файла, если задан.
+	applyEnv(&cfg)
+
 	if cfg.APIURL == "" || cfg.IngestToken == "" {
 		return cfg, errors.New("api_url и ingest_token обязательны")
 	}
@@ -56,6 +61,21 @@ func loadConfig(path string) (Config, error) {
 		cfg.PollInterval = "5s"
 	}
 	return cfg, nil
+}
+
+func applyEnv(cfg *Config) {
+	if v := os.Getenv("TELEGRAM_TOKEN"); v != "" {
+		cfg.TelegramToken = v
+	}
+	if v := os.Getenv("TELEGRAM_CHAT"); v != "" {
+		cfg.TelegramChat = v
+	}
+	if v := os.Getenv("FCM_CREDENTIALS"); v != "" {
+		cfg.FCMCreds = v
+	}
+	if v := os.Getenv("FCM_TOPIC"); v != "" {
+		cfg.FCMTopic = v
+	}
 }
 
 // Notifier шлёт одно уведомление.

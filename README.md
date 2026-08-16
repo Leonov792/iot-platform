@@ -94,6 +94,112 @@ cd web && npm install && npm run dev
 
 Или коротко через `make`: `make api` / `make gw` / `make web` / `make emu` / `make test`.
 
+## Боевое развёртывание (On-Premise)
+
+Пошаговый runbook для закрытого контура (дом/бассейн/спортзал). Ядро поднимается
+через `docker compose`, промышленные фичи — через конфиги и env.
+
+### 1. Секреты и сеть
+
+Скопируй `.env.example` в `.env` и замени dev-значения на реальные:
+
+- `JWT_SECRET` — длинная случайная строка (подпись токенов);
+- `INGEST_TOKEN` — общий секрет между API и гейтвеем (и Modbus/автоматизацией/алертами);
+- device token — выпускается отдельно на каждое устройство (см. ниже).
+
+Порты наружу: API `8080`, гейтвей `4000`, web `80`, modbus-poller `8090`,
+automation `8091`, ai `8095`, Ollama `11434`, MQTT `1883`.
+
+### 2. База (TimescaleDB)
+
+Поднимается в compose автоматически. Миграции накатывает API при старте
+(гипертаблица + сжатие телеметрии старше 7 дней). Для реальных объёмов повесь
+бэкап на `pgdata`-том.
+
+### 3. Реальные датчики по Modbus TCP
+
+IP/регистры устройств бассейна задаются в `modbus.json` (см. `modbus.example.json`):
+
+```jsonc
+{
+  "api_url": "http://api:8080",
+  "ingest_token": "<INGEST_TOKEN>",
+  "write_token": "<свой-токен-записи>",
+  "devices": [
+    {
+      "id": "pool-pump",
+      "host": "192.168.1.50",   // ← IP контроллера
+      "port": 502,
+      "unit": 1,
+      "points": [
+        { "name": "ph", "register": "input", "address": 0, "scale": 0.01 },
+        { "name": "orp", "register": "input", "address": 1, "scale": 1.0 }
+      ],
+      "relays": [
+        { "name": "fill_valve", "register": "coil", "address": 0 }
+      ]
+    }
+  ]
+}
+```
+
+Адреса регистров бери из документации контроллера. Проверка соединения:
+`curl http://<хост>:8090/health` и `curl http://<хост>:8090/logs`.
+
+### 4. Беспроводные датчики по MQTT
+
+В env гейтвея: `MQTT_ENABLED=true`, `MQTT_HOST=<IP брокера>`, `MQTT_TOPICS=iot/+/telemetry`.
+Шлюз (Zigbee/Tuya) должен слать JSON в топик `iot/<device_id>/telemetry` —
+гейтвей переложит в шину и сохранит в API.
+
+### 5. Автоматизация (rules engine)
+
+Правила в `automation.json` (см. `automation.example.json`): условия по полям
+телеметрии + действия `modbus_write`. Управляется на лету через
+`PUT /v1/rules` с заголовком `X-Automation-Token: <rules_token>` (конструктор в
+мобилке ходит сюда же).
+
+### 6. Локальный ИИ (Ollama)
+
+В compose `ollama` уже поднят. Вытяни модель и укажи её в env AI-сервиса:
+
+```bash
+docker compose exec ollama ollama pull llama3.1
+# env: OLLAMA_MODEL=llama3.1, OLLAMA_URL=http://ollama:11434
+```
+
+Проверка: `curl http://<хост>:8095/v1/status`. Парсер намерений — `POST /v1/intent`
+(`{"text":"подготовь спортзал и синюю подсветку"}`) → JSON-массив команд.
+
+### 7. Алерты (Telegram / FCM)
+
+Секреты задаются через env (переопределяют значение из `alerts.json`):
+
+- Telegram: `TELEGRAM_TOKEN=<бот-токен>`, `TELEGRAM_CHAT=<chat_id>`;
+- FCM: `FCM_CREDENTIALS=<путь к service-account.json>`, `FCM_TOPIC=iot-alerts`.
+
+Пороги аварий — в `alerts.json` (`alerts.example.json`).
+
+### 8. Мобилки под реальный IP
+
+По умолчанию в коде зашиты `localhost` (iOS) и `10.0.2.2` (Android). Для боя
+поменяй на IP сервера:
+- Android: `mobile/android/app/build.gradle.kts` → `API_BASE_URL`, `WS_BASE_URL`;
+- iOS: `mobile/ios/IoTHome/ContentView.swift` → `APIClient.base` и `TelemetryStream`.
+
+### 9. Device token для устройств
+
+Гейтвей проверяет token на WS-хендшейке. Выпусти его для каждого устройства
+(owner, JWT):
+
+```bash
+curl -X POST http://<хост>:8080/api/v1/devices/<device-id>/token \
+  -H "Authorization: Bearer <JWT>"
+```
+
+Полученный токен передай устройству/эмулятору (`sensor-emu -token <token>`).
+Для локальной разработки проверку можно отключить: `DEVICE_AUTH_ENABLED=false`.
+
 ## Тесты
 
 ```bash

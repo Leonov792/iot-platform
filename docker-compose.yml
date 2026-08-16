@@ -85,8 +85,11 @@ services:
       dockerfile: alerts/Dockerfile
     environment:
       ALERTS_CONFIG: /etc/iot/alerts.json
+      # секреты — через env (переопределяют значение из alerts.json)
       TELEGRAM_TOKEN: ""
       TELEGRAM_CHAT: ""
+      FCM_CREDENTIALS: ""
+      FCM_TOPIC: "iot-alerts"
     volumes:
       - ./alerts/alerts.example.json:/etc/iot/alerts.json
     depends_on:
