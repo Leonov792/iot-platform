@@ -18,6 +18,10 @@ type Engine struct {
 	rules    []Rule
 	executor Executor
 
+	// onFire — опциональный колбэк, вызывается при каждом срабатывании правила
+	// (для метрик/логирования событий в БД). nil = не вызывается.
+	onFire func(Rule)
+
 	mu       sync.Mutex
 	lastFire map[string]time.Time
 }
@@ -28,6 +32,13 @@ func NewEngine(rules []Rule, executor Executor) *Engine {
 		executor: executor,
 		lastFire: map[string]time.Time{},
 	}
+}
+
+// SetOnFire задаёт колбэк срабатывания правила.
+func (e *Engine) SetOnFire(fn func(Rule)) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.onFire = fn
 }
 
 // Rules возвращает копию текущего набора правил.
@@ -84,9 +95,13 @@ func (e *Engine) Evaluate(states map[string]map[string]float64, now time.Time) {
 func (e *Engine) fire(r Rule, now time.Time) {
 	e.mu.Lock()
 	e.lastFire[r.ID] = now
+	onFire := e.onFire
 	e.mu.Unlock()
 
 	slog.Info("правило сработало", "rule", r.Name, "id", r.ID)
+	if onFire != nil {
+		onFire(r)
+	}
 	for _, a := range r.Actions {
 		e.exec(a)
 	}

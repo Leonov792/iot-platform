@@ -178,6 +178,9 @@ func main() {
 	reader := newTelemetryReader(cfg.APIURL, cfg.IngestToken, httpClient)
 
 	engine := rules.NewEngine(cfg.Rules, executor)
+	engine.SetOnFire(func(r rules.Rule) {
+		reportEvent(httpClient, cfg.APIURL, cfg.IngestToken, r)
+	})
 	interval, err := time.ParseDuration(cfg.PollInterval)
 	if err != nil {
 		interval = 2 * time.Second
@@ -213,6 +216,72 @@ func main() {
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "метод не тот"})
 		}
 	})
+	mux.HandleFunc("/v1/automations/validate", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Automation-Token") != cfg.RulesToken {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "неверный automation-токен"})
+			return
+		}
+		var f Flow
+		if err := json.NewDecoder(r.Body).Decode(&f); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "кривой json"})
+			return
+		}
+		errs := ValidateFlow(&f)
+		if len(errs) > 0 {
+			writeJSON(w, http.StatusOK, map[string]any{"valid": false, "errors": errs, "rules": []any{}})
+			return
+		}
+		rule, err := FlowToRule(&f)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"valid": true, "errors": []string{}, "rules": []rules.Rule{rule}})
+	})
+
+	mux.HandleFunc("/v1/automations/flows", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Automation-Token") != cfg.RulesToken {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "неверный automation-токен"})
+			return
+		}
+		if r.Method != http.MethodPut {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "метод не тот"})
+			return
+		}
+		var flows []Flow
+		if err := json.NewDecoder(r.Body).Decode(&flows); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "кривой json"})
+			return
+		}
+
+		newRules := make([]rules.Rule, 0, len(flows))
+		var allErrs []string
+		for _, f := range flows {
+			if errs := ValidateFlow(&f); len(errs) > 0 {
+				allErrs = append(allErrs, errs...)
+				continue
+			}
+			rule, err := FlowToRule(&f)
+			if err != nil {
+				allErrs = append(allErrs, err.Error())
+				continue
+			}
+			newRules = append(newRules, rule)
+		}
+		if len(allErrs) > 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "невалидный flow", "errors": allErrs})
+			return
+		}
+
+		engine.SetRules(newRules)
+		cfg.Rules = newRules
+		if err := persistConfig(*configPath, cfg); err != nil {
+			slog.Error("не сохранил правила на диск", "err", err)
+		}
+		slog.Info("flows применены", "count", len(newRules))
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -263,6 +332,35 @@ func persistConfig(path string, cfg Config) error {
 		return err
 	}
 	return os.WriteFile(path, b, 0o600)
+}
+
+// reportEvent шлёт событие срабатывания правила в go api (для бизнес-метрик).
+// fire-and-forget: не блокируем движок из-за недоступности api.
+func reportEvent(client *http.Client, apiURL, token string, r rules.Rule) {
+	body, err := json.Marshal(map[string]any{
+		"rule_id":   r.ID,
+		"rule_name": r.Name,
+		"device_id": r.Condition.DeviceID,
+	})
+	if err != nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		apiURL+"/internal/automation-events", bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Ingest-Token", token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	_ = resp.Body.Close()
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

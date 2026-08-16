@@ -63,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dir: [automation, alerts, ai]
+        dir: [automation, alerts, ai, eco]
     defaults:
       run:
         working-directory: ${{ matrix.dir }}

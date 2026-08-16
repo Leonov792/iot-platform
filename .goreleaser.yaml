@@ -105,6 +105,23 @@ builds:
       - goos: darwin
         goarch: arm
 
+  - id: eco
+    dir: eco
+    main: .
+    binary: iot-eco
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64, arm]
+    goarm: ['7']
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: windows
+        goarch: arm
+      - goos: darwin
+        goarch: arm
+
 archives:
   - formats: [tar.gz]
     name_template: >-

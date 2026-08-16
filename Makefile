@@ -1,6 +1,6 @@
 # шпаргалка, чтобы не помнить все команды. tabs в make — зло, но что поделать
 
-.PHONY: up down api gw web emu parser modbus automation alerts ai test
+.PHONY: up down api gw web emu parser modbus automation alerts ai eco deploy-grafana test
 
 up:
 	docker compose up --build
@@ -35,6 +35,14 @@ alerts:
 ai:
 	cd ai && go run .
 
+eco:
+	cd eco && go run .
+
+# поднимает стек мониторинга; provisioning и дашборды подхватываются из репозитория
+deploy-grafana:
+	docker compose up -d node-exporter prometheus grafana
+	docker compose restart grafana
+
 test:
 	cd api && go test ./...
 	cd parser && cargo test
@@ -42,4 +50,5 @@ test:
 	cd automation && go test ./...
 	cd alerts && go vet ./...
 	cd ai && go test ./...
+	cd eco && go test ./...
 	cd web && npm test

@@ -18,11 +18,12 @@ type Handler struct {
 	gateway     commandSender
 	users       userStore
 	commands    commandLogger
+	events      automationEventStore
 	ingestToken string
 }
 
-func NewHandler(devices deviceStore, gw commandSender, users userStore, commands commandLogger, ingestToken string) *Handler {
-	return &Handler{devices: devices, gateway: gw, users: users, commands: commands, ingestToken: ingestToken}
+func NewHandler(devices deviceStore, gw commandSender, users userStore, commands commandLogger, events automationEventStore, ingestToken string) *Handler {
+	return &Handler{devices: devices, gateway: gw, users: users, commands: commands, events: events, ingestToken: ingestToken}
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {

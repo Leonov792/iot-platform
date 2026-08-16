@@ -8,4 +8,7 @@ config :gateway,
   mqtt_enabled: System.get_env("MQTT_ENABLED", "false") == "true",
   mqtt_host: System.get_env("MQTT_HOST", "localhost"),
   mqtt_port: String.to_integer(System.get_env("MQTT_PORT", "1883")),
-  mqtt_topics: String.split(System.get_env("MQTT_TOPICS", "iot/+/telemetry"), ",")
+  mqtt_topics: String.split(System.get_env("MQTT_TOPICS", "iot/+/telemetry"), ","),
+  discovery_enabled: System.get_env("DISCOVERY_ENABLED", "false") == "true",
+  discovery_subnet: System.get_env("DISCOVERY_SUBNET", "192.168.1.0/24"),
+  discovery_interval_ms: String.to_integer(System.get_env("DISCOVERY_INTERVAL_MS", "300000"))

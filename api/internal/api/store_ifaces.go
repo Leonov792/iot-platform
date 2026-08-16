@@ -6,6 +6,7 @@ import (
 
 	"iot-platform/api/internal/gateway"
 	"iot-platform/api/internal/models"
+	"iot-platform/api/internal/store"
 )
 
 // интерфейсы хранилищ нужны, чтобы хендлеры можно было тестировать без базы.
@@ -44,4 +45,14 @@ type commandSender interface {
 
 type commandLogger interface {
 	Insert(ctx context.Context, deviceID, userID, action string, value any) error
+}
+
+type discoveryStore interface {
+	Upsert(ctx context.Context, ip string, port int, service string) (bool, error)
+	List(ctx context.Context, status string) ([]store.DiscoveredDevice, error)
+	SetStatus(ctx context.Context, id int64, status string) error
+}
+
+type automationEventStore interface {
+	InsertEvent(ctx context.Context, ruleID, ruleName, deviceID string) error
 }

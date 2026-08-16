@@ -229,12 +229,13 @@ func newTestRouter() (http.Handler, *fakeDeviceStore, *fakeUserStore, *fakeTelem
 	ts := newFakeTelemetryStore()
 	gw := &fakeGateway{}
 
-	h := NewHandler(ds, gw, us, nil, "test-token")
+	h := NewHandler(ds, gw, us, nil, nil, "test-token")
 	ah := NewAuthHandler(us)
 	th := NewTelemetryHandler(ts, ds, "test-token")
 	uh := NewUsersHandler(us)
+	dh := NewDiscoveryHandler(&fakeDiscoveryStore{}, "test-token")
 
-	return NewRouter(h, ah, th, uh), ds, us, ts, gw
+	return NewRouter(h, ah, th, uh, dh), ds, us, ts, gw
 }
 
 func authHeader(userID string) string {
@@ -245,6 +246,50 @@ func authHeader(userID string) string {
 func authHeaderRole(userID, role, homeID string) string {
 	tok, _ := auth.GenerateTokenWithRole(userID, role, homeID, time.Hour)
 	return "Bearer " + tok
+}
+
+type fakeDiscoveryStore struct {
+	mu      sync.Mutex
+	devices []store.DiscoveredDevice
+}
+
+func (f *fakeDiscoveryStore) Upsert(_ context.Context, ip string, port int, service string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.devices {
+		if f.devices[i].IP == ip && f.devices[i].Port == port {
+			return false, nil
+		}
+	}
+	f.devices = append(f.devices, store.DiscoveredDevice{IP: ip, Port: port, Service: service, Status: "pending"})
+	return true, nil
+}
+
+func (f *fakeDiscoveryStore) List(_ context.Context, status string) ([]store.DiscoveredDevice, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if status == "" {
+		return append([]store.DiscoveredDevice(nil), f.devices...), nil
+	}
+	out := make([]store.DiscoveredDevice, 0)
+	for _, d := range f.devices {
+		if d.Status == status {
+			out = append(out, d)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeDiscoveryStore) SetStatus(_ context.Context, id int64, status string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.devices {
+		if f.devices[i].ID == id {
+			f.devices[i].Status = status
+			return nil
+		}
+	}
+	return store.ErrNotFound
 }
 
 func doJSON(t *testing.T, h http.Handler, method, path string, body any, headers map[string]string) *httptest.ResponseRecorder {

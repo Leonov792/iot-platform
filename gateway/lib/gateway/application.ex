@@ -9,6 +9,7 @@ defmodule Gateway.Application do
       {Finch, name: Gateway.Finch},
       Gateway.Registry,
       Gateway.MQTT,
+      Gateway.Discovery,
       {Bandit, plug: Gateway.Router, scheme: :http, port: port, ip: {0, 0, 0, 0}}
     ]
 

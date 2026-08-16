@@ -36,6 +36,9 @@ services:
       MQTT_ENABLED: "false"
       MQTT_HOST: mosquitto
       MQTT_PORT: "1883"
+      DISCOVERY_ENABLED: "false"
+      DISCOVERY_SUBNET: 192.168.1.0/24
+      DISCOVERY_INTERVAL_MS: "300000"
     ports:
       - "4000:4000"
     depends_on:
@@ -124,6 +127,66 @@ services:
     ports:
       - "1883:1883"
 
+  # EcoPlanner: оптимизация нагрева бассейна по тарифам (Energy-Charts) и погоде
+  eco:
+    build:
+      context: .
+      dockerfile: eco/Dockerfile
+    environment:
+      API_URL: http://api:8080
+      INGEST_TOKEN: dev-ingest-token
+      ECO_DEVICE_ID: pool-heater
+      OWM_API_KEY: ""
+      OWM_CITY: Berlin
+      ECO_BZN: DE-LU
+      ECO_HEAT_HOURS: "4"
+      ECO_INTERVAL: 30m
+      ECO_PORT: "8096"
+    ports:
+      - "8096:8096"
+    depends_on:
+      - api
+
+  # ---- Мониторинг (Grafana из коробки) ----
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    command:
+      - '--path.rootfs=/host'
+    pid: host
+    volumes:
+      - '/:/host:ro,rslave'
+    ports:
+      - "9100:9100"
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - node-exporter
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - postgres
+
 volumes:
   pgdata:
   ollama:
+  prometheus-data:
+  grafana-data:

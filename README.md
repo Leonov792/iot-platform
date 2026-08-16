@@ -217,6 +217,40 @@ slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
   инфо — `slog.Info`. Фатальные — `slog.Error` + `os.Exit(1)`.
 - Поля — именованные пары `ключ=значение`, без сшивания строк в сообщении.
 
+### 11. Автоматическое сканирование сети (Discovery)
+
+Гейтвей раз в `DISCOVERY_INTERVAL_MS` (дефолт 5 мин) сканирует `DISCOVERY_SUBNET`
+(порты 502 Modbus / 1883 MQTT) и пишет найденные устройства в таблицу
+`discovered_devices` (статусы `pending/approved/ignored`). Включается флагом
+`DISCOVERY_ENABLED=true`. Владелец видит их через `GET /api/v1/discovered` и
+подтверждает/отклоняет: `POST /api/v1/discovered/{id}/approve|ignore`.
+
+### 12. EcoPlanner (энергосбережение бассейна)
+
+Сервис `eco/` тянет прогноз OpenWeatherMap и цены Energy-Charts
+(`https://api.energy-charts.info/price?bzn=DE-LU`), строит дешёвое окно нагрева
+ночью (23:00–06:00) и пишет `eco_mode`/`eco_plan` в состояние устройства. Env:
+`OWM_API_KEY`, `OWM_CITY`, `ECO_BZN`, `ECO_DEVICE_ID`, `ECO_HEAT_HOURS`,
+`ECO_INTERVAL`. Без `OWM_API_KEY` работает на «погодной» эвристике.
+
+### 13. Конструктор автоматизаций (flow_json)
+
+Бэкенд принимает граф `flow_json` (ноды `trigger`/`action` + рёбра) и транслирует
+его в правила движка. Эндпоинты (под `X-Automation-Token`):
+- `POST /v1/automations/validate` → `{valid, errors, rules}` (валидация перед сохранением);
+- `PUT /v1/automations/flows` → применить список flow, сохранить.
+
+### 14. Мониторинг (Grafana из коробки)
+
+`docker compose` поднимает `grafana` + `prometheus` + `node_exporter`. Дашборды
+доступны без входа (анонимный Viewer, админ-пароль — `GRAFANA_ADMIN_PASSWORD`):
+- **Server Metrics** — CPU/RAM/Disk/Network (node_exporter → Prometheus);
+- **Database (TimescaleDB)** — размер БД, соединения, hypertables, частота записи;
+- **Business Metrics** — пользователи, устройства, сработавшие автоматизации/день.
+
+Развёртывание: `make deploy-grafana` (provisioning и дашборды подхватываются из
+репозитория). Grafana: `http://<хост>:3000`, Prometheus: `:9090`.
+
 ## Тесты
 
 ```bash
@@ -245,8 +279,13 @@ CI гоняет всё это на каждый push и PR (см. `.github/workf
 | PUT | `/api/v1/users/{id}/role` | Смена роли (owner) |
 | PUT | `/api/v1/users/{id}/schedule` | Расписание доступа (owner) |
 | POST | `/api/v1/telemetry` | Ингест телеметрии (заголовок `X-Ingest-Token`) |
+| GET | `/api/v1/discovered` | Найденные в сети устройства (owner) |
+| POST | `/api/v1/discovered/{id}/approve\|ignore` | Подтвердить/отклонить найденное (owner) |
 | POST | `/internal/device/{id}/verify` | Проверка device token (гейтвей) |
 | GET | `/internal/telemetry/{id}/latest` | Последняя телеметрия (автоматизация/ИИ) |
+| POST | `/internal/discovered` | Upsert найденного устройства (гейтвей-сканер) |
+| POST | `/internal/automation-events` | Событие срабатывания правила (движок) |
+| POST | `/internal/devices/{id}/eco` | eco_mode/eco_plan от EcoPlanner |
 
 WebSocket гейтвея:
 
@@ -279,11 +318,12 @@ WebSocket гейтвея:
 
 | Сервис | Стек | Что делает |
 |---|---|---|
-| `automation/` | Go | Rules Engine: `IF [Condition] THEN [Action]` (долив воды, хлор/pH, климат) |
+| `automation/` | Go | Rules Engine: `IF [Condition] THEN [Action]` + парсинг `flow_json` (граф нод/рёбер) и валидация |
 | `alerts/` | Go | Push-уведомления (FCM + Telegram) о критических авариях |
 | `ai/` | Go | Ollama-клиент, парсинг намерений в JSON, предиктивный анализ |
+| `eco/` | Go | EcoPlanner: оптимизация нагрева бассейна по тарифам (Energy-Charts) и погоде (OpenWeatherMap) |
 | `api/cmd/modbus-poller` | Go | Драйвер Modbus TCP (датчики химии бассейна, реле/клапаны) |
-| `gateway` | Elixir | + MQTT-клиент (tortoise) для Zigbee/Tuya-шлюзов |
+| `gateway` | Elixir | + MQTT-клиент (tortoise) + сканер подсети (Discovery: Modbus 502 / MQTT 1883) |
 
 ## Бинарный протокол
 

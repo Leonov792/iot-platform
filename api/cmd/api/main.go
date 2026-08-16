@@ -45,17 +45,20 @@ func main() {
 	users := store.NewUserStore(pool)
 	telemetry := store.NewTelemetryStore(pool)
 	commands := store.NewCommandLogStore(pool)
+	discovery := store.NewDiscoveryStore(pool)
+	events := store.NewAutomationEventStore(pool)
 
 	gw := gateway.NewClient(cfg.GatewayURL, &http.Client{Timeout: 5 * time.Second})
 
-	h := api.NewHandler(devices, gw, users, commands, cfg.IngestToken)
+	h := api.NewHandler(devices, gw, users, commands, events, cfg.IngestToken)
 	ah := api.NewAuthHandler(users)
 	th := api.NewTelemetryHandler(telemetry, devices, cfg.IngestToken)
 	uh := api.NewUsersHandler(users)
+	dh := api.NewDiscoveryHandler(discovery, cfg.IngestToken)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: api.NewRouter(h, ah, th, uh),
+		Handler: api.NewRouter(h, ah, th, uh, dh),
 		// таймауты добавил не сразу: компилятор молчал, но голанци орал. вставил на всякий
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
