@@ -9,12 +9,22 @@
 /* Begin PBXBuildFile section */
 		100000000000000000000001 /* IoTHomeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000001 /* IoTHomeApp.swift */; };
 		100000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000002 /* ContentView.swift */; };
+		100000000000000000000003 /* ColorWheelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000004 /* ColorWheelView.swift */; };
+		100000000000000000000004 /* AutomationBuilderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000005 /* AutomationBuilderView.swift */; };
+		100000000000000000000005 /* UndoGestureDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000006 /* UndoGestureDetector.swift */; };
+		100000000000000000000006 /* HRVSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000007 /* HRVSender.swift */; };
+		100000000000000000000007 /* XRayARView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000008 /* XRayARView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		200000000000000000000001 /* IoTHomeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IoTHomeApp.swift; sourceTree = "<group>"; };
 		200000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		200000000000000000000003 /* IoTHome.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IoTHome.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		200000000000000000000004 /* ColorWheelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorWheelView.swift; sourceTree = "<group>"; };
+		200000000000000000000005 /* AutomationBuilderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationBuilderView.swift; sourceTree = "<group>"; };
+		200000000000000000000006 /* UndoGestureDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UndoGestureDetector.swift; sourceTree = "<group>"; };
+		200000000000000000000007 /* HRVSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HRVSender.swift; sourceTree = "<group>"; };
+		200000000000000000000008 /* XRayARView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XRayARView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -41,6 +51,11 @@
 			children = (
 				200000000000000000000001 /* IoTHomeApp.swift */,
 				200000000000000000000002 /* ContentView.swift */,
+				200000000000000000000004 /* ColorWheelView.swift */,
+				200000000000000000000005 /* AutomationBuilderView.swift */,
+				200000000000000000000006 /* UndoGestureDetector.swift */,
+				200000000000000000000007 /* HRVSender.swift */,
+				200000000000000000000008 /* XRayARView.swift */,
 			);
 			path = IoTHome;
 			sourceTree = "<group>";
@@ -123,6 +138,11 @@
 			files = (
 				100000000000000000000001 /* IoTHomeApp.swift in Sources */,
 				100000000000000000000002 /* ContentView.swift in Sources */,
+				100000000000000000000003 /* ColorWheelView.swift in Sources */,
+				100000000000000000000004 /* AutomationBuilderView.swift in Sources */,
+				100000000000000000000005 /* UndoGestureDetector.swift in Sources */,
+				100000000000000000000006 /* HRVSender.swift in Sources */,
+				100000000000000000000007 /* XRayARView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -175,6 +195,8 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Камера нужна для X-Ray AR (просмотр труб и кабелей за стенами)";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Доступ к HRV нужен для предсказания фазы пробуждения (мягкий рассвет)";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -200,6 +222,8 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Камера нужна для X-Ray AR (просмотр труб и кабелей за стенами)";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Доступ к HRV нужен для предсказания фазы пробуждения (мягкий рассвет)";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (

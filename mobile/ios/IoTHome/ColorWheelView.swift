@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Цветовое колесо (RGB/HSV) для управления RGB-освещением
 

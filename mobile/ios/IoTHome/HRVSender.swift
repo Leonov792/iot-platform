@@ -43,7 +43,10 @@ final class HRVSender {
 
     // Читаем последний отсчёт HRV (SDNN) из HealthKit.
     private func latestHRV(completion: @escaping (Double) -> Void) {
-        let type = HKQuantityType(.heartRateVariabilitySDNN)
+        guard let type = HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN) else {
+            completion(0)
+            return
+        }
         let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
         let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: [sort]) { _, samples, _ in
             guard let sample = samples?.first as? HKQuantitySample else {
