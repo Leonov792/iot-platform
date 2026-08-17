@@ -251,6 +251,18 @@ slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 Развёртывание: `make deploy-grafana` (provisioning и дашборды подхватываются из
 репозитория). Grafana: `http://<хост>:3000`, Prometheus: `:9090`.
 
+### 15. HomeKit (мост HAP)
+
+Сервис `homekit/` пробрасывает устройства умного дома в Apple Home как аксессуары
+(лампа → Lightbulb с яркостью, розетка → Outlet, термостат → Thermostat, датчик →
+Temperature/Humidity). Env: `HOMEBRIDGE_EMAIL`/`HOMEBRIDGE_PASSWORD` (аккаунт дома),
+`HOMEBRIDGE_PIN` (8 цифр, код пары), `HOMEBRIDGE_STORE` (pairing-данные).
+
+Внимание: для обнаружения мостом нужен **mDNS/Bonjour** — запускай на host-сети
+(Linux, в compose уже `network_mode: host`). Пара выполняется из приложения «Дом»
+(iOS/macOS): «Добавить аксессуар» → ввести PIN. Добавление новых устройств требует
+рестарта моста.
+
 ## Тесты
 
 ```bash
@@ -322,6 +334,7 @@ WebSocket гейтвея:
 | `alerts/` | Go | Push-уведомления (FCM + Telegram) о критических авариях |
 | `ai/` | Go | Ollama-клиент, парсинг намерений в JSON, предиктивный анализ |
 | `eco/` | Go | EcoPlanner: оптимизация нагрева бассейна по тарифам (Energy-Charts) и погоде (OpenWeatherMap) |
+| `homekit/` | Go | HomeKit-мост (HAP): пробрасывает лампы/розетки/термостаты/датчики в Apple Home |
 | `api/cmd/modbus-poller` | Go | Драйвер Modbus TCP (датчики химии бассейна, реле/клапаны) |
 | `gateway` | Elixir | + MQTT-клиент (tortoise) + сканер подсети (Discovery: Modbus 502 / MQTT 1883) |
 
@@ -351,9 +364,11 @@ iot-platform/
 ├── api/            # Go: REST API + RBAC + БД (+ modbus-poller)
 ├── gateway/        # Elixir: WebSocket-шина + PubSub + Rustler NIF + MQTT
 ├── parser/         # Rust: парсер бинарной телеметрии (lib для NIF + bin)
-├── automation/     # Go: rules engine
+├── automation/     # Go: rules engine (+ flow_json)
 ├── alerts/         # Go: уведомления (FCM + Telegram)
 ├── ai/             # Go: локальный ИИ (Ollama)
+├── eco/            # Go: EcoPlanner (энергосбережение)
+├── homekit/        # Go: HomeKit-мост (HAP)
 ├── web/            # Vue 3: дашборд + админка
 ├── mobile/
 │   ├── ios/        # SwiftUI-клиент (color wheel, конструктор автоматизаций)

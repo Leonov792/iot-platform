@@ -147,6 +147,24 @@ services:
     depends_on:
       - api
 
+  # HomeKit-мост (HAP). Требует host-сети (Linux) — mDNS/Bonjour для пары с HomeKit.
+  homekit:
+    build:
+      context: .
+      dockerfile: homekit/Dockerfile
+    network_mode: host
+    environment:
+      API_URL: http://localhost:8080
+      HOMEBRIDGE_EMAIL: ""
+      HOMEBRIDGE_PASSWORD: ""
+      HOMEBRIDGE_PIN: "00102003"
+      HOMEBRIDGE_STORE: /app/homekit-store
+      HOMEBRIDGE_ADDR: ":51826"
+    volumes:
+      - homekit-store:/app/homekit-store
+    depends_on:
+      - api
+
   # ---- Мониторинг (Grafana из коробки) ----
   node-exporter:
     image: prom/node-exporter:v1.8.2
@@ -190,3 +208,4 @@ volumes:
   ollama:
   prometheus-data:
   grafana-data:
+  homekit-store:
