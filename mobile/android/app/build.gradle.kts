@@ -55,5 +55,5 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     // ARCore (X-Ray AR) + Health Connect (HRV)
     implementation("io.github.sceneview:arsceneview:2.3.0")
-    implementation("androidx.health.connect:connect-client:1.1.0")
+    implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
 }
