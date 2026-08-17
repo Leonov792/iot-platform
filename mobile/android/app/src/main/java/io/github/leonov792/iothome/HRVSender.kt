@@ -2,7 +2,7 @@ package io.github.leonov792.iothome
 
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
-import androidx.health.connect.client.records.HeartRateVariabilityRmssd
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.google.gson.Gson
@@ -48,7 +48,7 @@ class HRVSender(
             val hc = HealthConnectClient.getOrCreate(context)
             val response = hc.readRecords(
                 ReadRecordsRequest(
-                    recordType = HeartRateVariabilityRmssd::class,
+                    recordType = HeartRateVariabilityRmssdRecord::class,
                     timeRangeFilter = TimeRangeFilter.after(Instant.now().minusSeconds(300)),
                     pageSize = 1
                 )
