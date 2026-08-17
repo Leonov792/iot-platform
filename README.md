@@ -263,6 +263,33 @@ Temperature/Humidity). Env: `HOMEBRIDGE_EMAIL`/`HOMEBRIDGE_PASSWORD` (аккау
 (iOS/macOS): «Добавить аксессуар» → ввести PIN. Добавление новых устройств требует
 рестарта моста.
 
+### 16. «Физический Ctrl+Z» (Undo / Saga)
+
+Команды пишутся в undo-стек (`command_history`) с предыдущим состоянием (Event
+Sourcing). Откат последней команды: `POST /api/v1/devices/{id}/undo` — бэкенд шлёт
+компенсирующую команду (реле/шторы/свет). Климат (`thermostat`) откатывается только
+если прошло < 5 минут — иначе пропускаем ради экономии энергии (решение ИИ-слоя).
+
+На мобилке — жест **shake + экран вниз** (`UndoGestureDetector.swift` / `.kt`):
+комбинированный детектор исключает ложные срабатывания в кармане.
+
+### 17. Wellness («мягкий рассвет» по HRV)
+
+Мобилка шлёт HRV каждые ~10 сек (`POST /api/v1/health/hrv`). Сервис `wellness/`
+читает отсчёты и, если за 15 мин до будильника HRV резко падает (выход из глубокой
+фазы), опережает будильник и запускает сценарий: шторы 15% → кофе (+2 мин) →
+тёплый пол +1°C (+3 мин). Отмена (`POST /v1/cancel`) = «негативный паттерн», сервис
+пропускает 7 дней. Настройки — `wellness.json`.
+
+### 18. X-Ray AR (каркас)
+
+Модель дома хранится в БД (`home_mesh`: геометрия + реперные точки + зоны труб).
+`PUT/GET /api/v1/mesh` — клиент грузит модель один раз, телеметрия летит по WS.
+Мобильный каркас (`XRayARView.swift` / `.kt`) — SLAM-привязка к якорям и тепловая
+карта (холод = синий, тепло = красный). Полная AR-реализация требует доработки на
+реальном устройстве (ARKit/ARCore); ультразвуковая эхо-локализация — вне текущего
+объёма (нужен DSP).
+
 ## Тесты
 
 ```bash
@@ -285,8 +312,11 @@ CI гоняет всё это на каждый push и PR (см. `.github/workf
 | GET/POST | `/api/v1/devices` | Список / создание устройства (JWT) |
 | PUT/DELETE | `/api/v1/devices/{id}` | Обновление / удаление (JWT, owner) |
 | POST | `/api/v1/devices/{id}/command` | Команда (вкл/выкл/яркость/температура/цвет) |
+| POST | `/api/v1/devices/{id}/undo` | Откат последней команды (Saga/Event Sourcing) |
 | GET | `/api/v1/devices/{id}/telemetry` | История для графика |
 | POST | `/api/v1/devices/{id}/token` | Выпуск device token (owner) |
+| POST | `/api/v1/health/hrv` | Приём HRV с мобилки (JWT) |
+| GET/PUT | `/api/v1/mesh` | Модель дома для X-Ray AR (GET: JWT, PUT: owner) |
 | GET/POST | `/api/v1/users` | Члены дома (owner) |
 | PUT | `/api/v1/users/{id}/role` | Смена роли (owner) |
 | PUT | `/api/v1/users/{id}/schedule` | Расписание доступа (owner) |
@@ -298,6 +328,7 @@ CI гоняет всё это на каждый push и PR (см. `.github/workf
 | POST | `/internal/discovered` | Upsert найденного устройства (гейтвей-сканер) |
 | POST | `/internal/automation-events` | Событие срабатывания правила (движок) |
 | POST | `/internal/devices/{id}/eco` | eco_mode/eco_plan от EcoPlanner |
+| GET | `/internal/hrv` | HRV-отсчёты (wellness-сервис) |
 
 WebSocket гейтвея:
 
@@ -335,6 +366,7 @@ WebSocket гейтвея:
 | `ai/` | Go | Ollama-клиент, парсинг намерений в JSON, предиктивный анализ |
 | `eco/` | Go | EcoPlanner: оптимизация нагрева бассейна по тарифам (Energy-Charts) и погоде (OpenWeatherMap) |
 | `homekit/` | Go | HomeKit-мост (HAP): пробрасывает лампы/розетки/термостаты/датчики в Apple Home |
+| `wellness/` | Go | «Мягкий рассвет»: предсказание пробуждения по HRV (shake-undo + сон) |
 | `api/cmd/modbus-poller` | Go | Драйвер Modbus TCP (датчики химии бассейна, реле/клапаны) |
 | `gateway` | Elixir | + MQTT-клиент (tortoise) + сканер подсети (Discovery: Modbus 502 / MQTT 1883) |
 
@@ -369,6 +401,7 @@ iot-platform/
 ├── ai/             # Go: локальный ИИ (Ollama)
 ├── eco/            # Go: EcoPlanner (энергосбережение)
 ├── homekit/        # Go: HomeKit-мост (HAP)
+├── wellness/       # Go: «мягкий рассвет» по HRV
 ├── web/            # Vue 3: дашборд + админка
 ├── mobile/
 │   ├── ios/        # SwiftUI-клиент (color wheel, конструктор автоматизаций)

@@ -229,13 +229,15 @@ func newTestRouter() (http.Handler, *fakeDeviceStore, *fakeUserStore, *fakeTelem
 	ts := newFakeTelemetryStore()
 	gw := &fakeGateway{}
 
-	h := NewHandler(ds, gw, us, nil, nil, "test-token")
+	h := NewHandler(ds, gw, us, nil, nil, nil, "test-token")
 	ah := NewAuthHandler(us)
 	th := NewTelemetryHandler(ts, ds, "test-token")
 	uh := NewUsersHandler(us)
 	dh := NewDiscoveryHandler(&fakeDiscoveryStore{}, "test-token")
+	wh := NewHRVHandler(&fakeHRVStore{}, "test-token")
+	mh := NewMeshHandler(&fakeMeshStore{})
 
-	return NewRouter(h, ah, th, uh, dh), ds, us, ts, gw
+	return NewRouter(h, ah, th, uh, dh, wh, mh), ds, us, ts, gw
 }
 
 func authHeader(userID string) string {
@@ -290,6 +292,46 @@ func (f *fakeDiscoveryStore) SetStatus(_ context.Context, id int64, status strin
 		}
 	}
 	return store.ErrNotFound
+}
+
+type fakeHRVStore struct {
+	mu      sync.Mutex
+	samples []store.HRVSample
+}
+
+func (f *fakeHRVStore) Insert(_ context.Context, _ string, value float64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.samples = append(f.samples, store.HRVSample{Value: value})
+	return nil
+}
+
+func (f *fakeHRVStore) Since(_ context.Context, _ string, _ time.Time) ([]store.HRVSample, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]store.HRVSample(nil), f.samples...), nil
+}
+
+type fakeMeshStore struct {
+	mu   sync.Mutex
+	mesh store.HomeMesh
+	err  error
+}
+
+func (f *fakeMeshStore) Put(_ context.Context, _ string, mesh, anchors, zones any) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.mesh = store.HomeMesh{Mesh: mesh, Anchors: anchors, Zones: zones}
+	return nil
+}
+
+func (f *fakeMeshStore) Get(_ context.Context, _ string) (store.HomeMesh, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return store.HomeMesh{}, f.err
+	}
+	return f.mesh, nil
 }
 
 func doJSON(t *testing.T, h http.Handler, method, path string, body any, headers map[string]string) *httptest.ResponseRecorder {

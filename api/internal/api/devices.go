@@ -19,11 +19,12 @@ type Handler struct {
 	users       userStore
 	commands    commandLogger
 	events      automationEventStore
+	history     commandHistoryStore
 	ingestToken string
 }
 
-func NewHandler(devices deviceStore, gw commandSender, users userStore, commands commandLogger, events automationEventStore, ingestToken string) *Handler {
-	return &Handler{devices: devices, gateway: gw, users: users, commands: commands, events: events, ingestToken: ingestToken}
+func NewHandler(devices deviceStore, gw commandSender, users userStore, commands commandLogger, events automationEventStore, history commandHistoryStore, ingestToken string) *Handler {
+	return &Handler{devices: devices, gateway: gw, users: users, commands: commands, events: events, history: history, ingestToken: ingestToken}
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -198,6 +199,19 @@ func (h *Handler) command(w http.ResponseWriter, r *http.Request) {
 
 	// оптимистично двигаем состояние в базе, чтобы фронт сразу видел новое
 	h.applyState(r.Context(), homeID, id, req.Action, req.Value)
+
+	// undo-стек: сохраняем предыдущее состояние (Event Sourcing)
+	if h.history != nil {
+		previous := d.State
+		if previous == nil {
+			previous = map[string]any{}
+		}
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			_ = h.history.Append(ctx, id, userID, req.Action, previous)
+		}()
+	}
 
 	// логируем команду для предиктивного анализа (не блокируем ответ)
 	if h.commands != nil {

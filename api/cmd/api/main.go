@@ -47,18 +47,23 @@ func main() {
 	commands := store.NewCommandLogStore(pool)
 	discovery := store.NewDiscoveryStore(pool)
 	events := store.NewAutomationEventStore(pool)
+	history := store.NewCommandHistoryStore(pool)
+	hrv := store.NewHRVStore(pool)
+	mesh := store.NewMeshStore(pool)
 
 	gw := gateway.NewClient(cfg.GatewayURL, &http.Client{Timeout: 5 * time.Second})
 
-	h := api.NewHandler(devices, gw, users, commands, events, cfg.IngestToken)
+	h := api.NewHandler(devices, gw, users, commands, events, history, cfg.IngestToken)
 	ah := api.NewAuthHandler(users)
 	th := api.NewTelemetryHandler(telemetry, devices, cfg.IngestToken)
 	uh := api.NewUsersHandler(users)
 	dh := api.NewDiscoveryHandler(discovery, cfg.IngestToken)
+	wh := api.NewHRVHandler(hrv, cfg.IngestToken)
+	mh := api.NewMeshHandler(mesh)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: api.NewRouter(h, ah, th, uh, dh),
+		Handler: api.NewRouter(h, ah, th, uh, dh, wh, mh),
 		// таймауты добавил не сразу: компилятор молчал, но голанци орал. вставил на всякий
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,

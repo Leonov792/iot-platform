@@ -147,6 +147,22 @@ services:
     depends_on:
       - api
 
+  # Wellness: предсказание пробуждения по HRV -> «мягкий рассвет»
+  wellness:
+    build:
+      context: .
+      dockerfile: wellness/Dockerfile
+    environment:
+      API_URL: http://api:8080
+      GATEWAY_URL: http://gateway:4000
+      INGEST_TOKEN: dev-ingest-token
+      WELLNESS_CONFIG: /etc/iot/wellness.json
+    volumes:
+      - ./wellness/wellness.example.json:/etc/iot/wellness.json
+    depends_on:
+      - api
+      - gateway
+
   # HomeKit-мост (HAP). Требует host-сети (Linux) — mDNS/Bonjour для пары с HomeKit.
   homekit:
     build:

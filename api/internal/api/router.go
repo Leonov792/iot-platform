@@ -9,7 +9,7 @@ import (
 	"iot-platform/api/internal/auth"
 )
 
-func NewRouter(h *Handler, ah *AuthHandler, th *TelemetryHandler, uh *UsersHandler, dh *DiscoveryHandler) http.Handler {
+func NewRouter(h *Handler, ah *AuthHandler, th *TelemetryHandler, uh *UsersHandler, dh *DiscoveryHandler, wh *HRVHandler, mh *MeshHandler) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -33,6 +33,7 @@ func NewRouter(h *Handler, ah *AuthHandler, th *TelemetryHandler, uh *UsersHandl
 				r.Post("/{id}/command", h.command)
 				r.Get("/{id}/telemetry", th.history)
 				r.Post("/{id}/token", h.generateDeviceToken)
+				r.Post("/{id}/undo", h.undo)
 			})
 			r.Route("/users", func(r chi.Router) {
 				r.Get("/", uh.list)
@@ -45,6 +46,11 @@ func NewRouter(h *Handler, ah *AuthHandler, th *TelemetryHandler, uh *UsersHandl
 				r.Post("/{id}/approve", dh.approve)
 				r.Post("/{id}/ignore", dh.ignore)
 			})
+			r.Post("/health/hrv", wh.ingest)
+			r.Route("/mesh", func(r chi.Router) {
+				r.Get("/", mh.get)
+				r.Put("/", mh.put)
+			})
 		})
 	})
 
@@ -54,6 +60,7 @@ func NewRouter(h *Handler, ah *AuthHandler, th *TelemetryHandler, uh *UsersHandl
 	r.Post("/internal/discovered", dh.upsertInternal)
 	r.Post("/internal/automation-events", h.ingestAutomationEvent)
 	r.Post("/internal/devices/{id}/eco", h.setEco)
+	r.Get("/internal/hrv", wh.internal)
 
 	// для докера, чтобы мог проверять живость
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {

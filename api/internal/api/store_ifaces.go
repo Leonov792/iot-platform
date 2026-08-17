@@ -56,3 +56,18 @@ type discoveryStore interface {
 type automationEventStore interface {
 	InsertEvent(ctx context.Context, ruleID, ruleName, deviceID string) error
 }
+
+type commandHistoryStore interface {
+	Append(ctx context.Context, deviceID, userID, action string, previous map[string]any) error
+	Last(ctx context.Context, deviceID, userID string) (store.CommandRecord, error)
+}
+
+type hrvStore interface {
+	Insert(ctx context.Context, userID string, value float64) error
+	Since(ctx context.Context, userID string, since time.Time) ([]store.HRVSample, error)
+}
+
+type meshStore interface {
+	Put(ctx context.Context, ownerID string, mesh, anchors, zones any) error
+	Get(ctx context.Context, ownerID string) (store.HomeMesh, error)
+}

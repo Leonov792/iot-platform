@@ -1,0 +1,16 @@
+{
+  "api_url": "http://localhost:8080",
+  "ingest_token": "dev-ingest-token",
+  "gateway_url": "http://localhost:4000",
+  "user_id": "owner-id",
+  "alarm": "07:00",
+  "window_min": 15,
+  "threshold": -1.0,
+  "poll_seconds": 10,
+  "listen": ":8097",
+  "steps": [
+    { "delay": "0s", "device_id": "curtains", "action": "set_brightness", "value": 15 },
+    { "delay": "2m", "device_id": "coffee-machine", "action": "on", "value": true },
+    { "delay": "3m", "device_id": "floor-heater", "action": "set_target", "value": 23 }
+  ]
+}
